@@ -1,0 +1,16 @@
+{
+  "cSpell.words": [
+    "ASGI",
+    "buildx",
+    "gunicorn",
+    "healthz",
+    "isready",
+    "libpq",
+    "noinput",
+    "nomic",
+    "PYTHONDONTWRITEBYTECODE",
+    "PYTHONUNBUFFERED",
+    "QDRANT",
+    "readyz"
+  ]
+}

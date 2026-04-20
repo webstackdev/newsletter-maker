@@ -45,7 +45,7 @@ The roadmap progresses from contextual actions (MVP) to multi-step skill chainin
 Each data source implements a common interface (`fetch_new_content`, `get_entity_profile`, `health_check`) and handles its own auth and rate limiting. The core system just calls the interface. Planned integrations:
 
 | Source | Purpose | Priority |
-|--------|---------|----------|
+| ------ | ------- | -------- |
 | RSS | Blog/site tracking for followed entities | Phase 1 |
 | Reddit | Trend detection and community sentiment | Phase 1 |
 | Resend Inbound | Newsletter email ingestion and authority signals | Phase 2 |
@@ -70,7 +70,7 @@ The system is designed for graceful failure, not silent corruption. Unparseable 
 ## Implementation Plan
 
 | Phase | Focus | Key Deliverables |
-|-------|-------|-------------------|
+| ----- | ----- | ---------------- |
 | **1. MVP** | Content ingestion + basic surfacing | RSS and Reddit plugins · Entity model in Postgres · Qdrant for embeddings · Classification, relevance scoring, and summarization skills · Dashboard with upvote/downvote · Seed script for demo data |
 | **2. Authority** | Newsletter ingestion + authority signals | Resend email intake with LLM extraction · Subscription confirmation flow · Authority scoring from mention frequency · Bluesky plugin · Deduplication and entity extraction skills |
 | **3. Intelligence** | Expanded sources + trend analysis | Mastodon plugin · Trend velocity detection · Theme suggestions · Source diversity analysis · Original content idea generation |
@@ -78,7 +78,32 @@ The system is designed for graceful failure, not silent corruption. Unparseable 
 
 ## Project Documentation
 
-- [PLANNING.md](PLANNING.md) — Full architecture decisions, data model, and feedback loop design
-- [VENDOR.md](VENDOR.md) — Per-skill model selection, rationale, and API pricing
-- [GENRES.md](GENRES.md) — Newsletter format types and layout templates
-- [IMPLEMENTATION.md](IMPLEMENTATION.md) — Additional implementation notes
+## Local Development
+
+```bash
+python3 -m venv newsletter-maker
+source newsletter-maker/bin/activate
+python3 -m pip install -r requirements.txt
+```
+
+1. Run `just dev` to build the Django image and start Django, Celery, Postgres, Redis, Qdrant, and Nginx. If `.env` is missing, the `just` command copies `.env.example` automatically.
+2. Update `.env` with non-default secrets before using the stack outside local development. The example file uses SQLite and localhost URLs so host-side `manage.py` commands work even without Docker.
+3. Open `http://localhost:8080/healthz/` for a liveness check and `http://localhost:8080/admin/` for Django admin.
+
+For host-based development without Docker, install `requirements.txt`, then use `python3 manage.py migrate` and `python3 manage.py runserver`. The default `.env.example` is host-safe; Docker Compose overrides the service URLs inside containers.
+
+When `just dev` is running, Django admin uses the Postgres database inside Docker, not the host SQLite database. That means host commands like `python manage.py createsuperuser` create users in SQLite and will not let you log into the Docker-backed admin site.
+
+Create or update an admin user for the running Docker stack with:
+
+```bash
+just createsuperuser
+just changepassword your-username
+```
+
+For the default local bootstrap, `.env` also seeds an `admin` superuser in the container database using `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, and `DJANGO_SUPERUSER_PASSWORD`.
+
+- [PLANNING.md](docs/PLANNING.md) — Full architecture decisions, data model, and feedback loop design
+- [VENDOR.md](docs/VENDOR.md) — Per-skill model selection, rationale, and API pricing
+- [GENRES.md](docs/GENRES.md) — Newsletter format types and layout templates
+- [IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — Additional implementation notes

@@ -40,11 +40,7 @@ Set up the Django project, Docker infrastructure, and development environment.
 
 **Definition of done:** `just dev` brings up all services, `/healthz/` returns 200, Django admin is accessible.
 
-Natural next steps:
-
-- Start WP2 by defining the initial models and admin registration.
-- Add a minimal DRF API namespace now so WP2 serializers/viewsets land into a stable structure.
-- Run the full container stack with docker compose up --build after installing just or directly via Docker.
+---
 
 ### WP2: Data Models
 
