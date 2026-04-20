@@ -6,14 +6,20 @@ from core.models import Content, Entity, IngestionRun, ReviewQueue, SkillResult,
 class TenantScopedSerializerMixin:
     def _filter_related_queryset(self, request):
         user = request.user
+        tenant = self.context.get("tenant")
         if "tenant" in self.fields:
             self.fields["tenant"].queryset = Tenant.objects.filter(user=user)
         if "entity" in self.fields:
-            self.fields["entity"].queryset = Entity.objects.filter(tenant__user=user)
+            entity_queryset = Entity.objects.filter(tenant=tenant) if tenant else Entity.objects.filter(tenant__user=user)
+            self.fields["entity"].queryset = entity_queryset
         if "content" in self.fields:
-            self.fields["content"].queryset = Content.objects.filter(tenant__user=user)
+            content_queryset = Content.objects.filter(tenant=tenant) if tenant else Content.objects.filter(tenant__user=user)
+            self.fields["content"].queryset = content_queryset
         if "superseded_by" in self.fields:
-            self.fields["superseded_by"].queryset = SkillResult.objects.filter(tenant__user=user)
+            skill_result_queryset = (
+                SkillResult.objects.filter(tenant=tenant) if tenant else SkillResult.objects.filter(tenant__user=user)
+            )
+            self.fields["superseded_by"].queryset = skill_result_queryset
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -41,7 +47,7 @@ class TenantConfigSerializer(TenantScopedSerializerMixin, serializers.ModelSeria
             "downvote_authority_weight",
             "authority_decay_rate",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "tenant"]
 
 
 class EntitySerializer(TenantScopedSerializerMixin, serializers.ModelSerializer):
@@ -62,7 +68,7 @@ class EntitySerializer(TenantScopedSerializerMixin, serializers.ModelSerializer)
             "twitter_handle",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "tenant", "created_at"]
 
 
 class ContentSerializer(TenantScopedSerializerMixin, serializers.ModelSerializer):
@@ -83,10 +89,10 @@ class ContentSerializer(TenantScopedSerializerMixin, serializers.ModelSerializer
             "relevance_score",
             "is_active",
         ]
-        read_only_fields = ["id", "ingested_at"]
+        read_only_fields = ["id", "tenant", "ingested_at"]
 
     def validate(self, attrs):
-        tenant = attrs.get("tenant") or getattr(self.instance, "tenant", None)
+        tenant = self.context.get("tenant") or attrs.get("tenant") or getattr(self.instance, "tenant", None)
         entity = attrs.get("entity") or getattr(self.instance, "entity", None)
         if tenant and entity and entity.tenant_id != tenant.id:
             raise serializers.ValidationError({"entity": "Entity must belong to the selected tenant."})
@@ -110,10 +116,10 @@ class SkillResultSerializer(TenantScopedSerializerMixin, serializers.ModelSerial
             "created_at",
             "superseded_by",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "tenant", "created_at"]
 
     def validate(self, attrs):
-        tenant = attrs.get("tenant") or getattr(self.instance, "tenant", None)
+        tenant = self.context.get("tenant") or attrs.get("tenant") or getattr(self.instance, "tenant", None)
         content = attrs.get("content") or getattr(self.instance, "content", None)
         if tenant and content and content.tenant_id != tenant.id:
             raise serializers.ValidationError({"content": "Content must belong to the selected tenant."})
@@ -126,10 +132,10 @@ class UserFeedbackSerializer(TenantScopedSerializerMixin, serializers.ModelSeria
     class Meta:
         model = UserFeedback
         fields = ["id", "content", "tenant", "user", "feedback_type", "created_at"]
-        read_only_fields = ["id", "user", "created_at"]
+        read_only_fields = ["id", "tenant", "user", "created_at"]
 
     def validate(self, attrs):
-        tenant = attrs.get("tenant") or getattr(self.instance, "tenant", None)
+        tenant = self.context.get("tenant") or attrs.get("tenant") or getattr(self.instance, "tenant", None)
         content = attrs.get("content") or getattr(self.instance, "content", None)
         if tenant and content and content.tenant_id != tenant.id:
             raise serializers.ValidationError({"content": "Content must belong to the selected tenant."})
@@ -150,17 +156,17 @@ class IngestionRunSerializer(TenantScopedSerializerMixin, serializers.ModelSeria
             "items_ingested",
             "error_message",
         ]
-        read_only_fields = ["id", "started_at"]
+        read_only_fields = ["id", "tenant", "started_at"]
 
 
 class ReviewQueueSerializer(TenantScopedSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = ReviewQueue
         fields = ["id", "tenant", "content", "reason", "confidence", "created_at", "resolved", "resolution"]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "tenant", "created_at"]
 
     def validate(self, attrs):
-        tenant = attrs.get("tenant") or getattr(self.instance, "tenant", None)
+        tenant = self.context.get("tenant") or attrs.get("tenant") or getattr(self.instance, "tenant", None)
         content = attrs.get("content") or getattr(self.instance, "content", None)
         if tenant and content and content.tenant_id != tenant.id:
             raise serializers.ValidationError({"content": "Content must belong to the selected tenant."})

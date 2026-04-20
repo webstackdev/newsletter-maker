@@ -371,11 +371,11 @@ A focused UI for reviewing and acting on surfaced content.
 
 **API integration:**
 - All data fetched via DRF endpoints
-- Skill invocations: `POST /api/v1/content/{id}/skills/{skill_name}/`
+- Skill invocations: `POST /api/v1/tenants/{tenant_id}/contents/{id}/skills/{skill_name}/`
   - Returns `202 Accepted` for async skills (summarization)
-  - Frontend polls `GET /api/v1/skill-results/{id}/` until `status=completed`
+    - Frontend polls `GET /api/v1/tenants/{tenant_id}/skill-results/{id}/` until `status=completed`
   - Returns `200` with result for fast skills (find related via Qdrant)
-- Feedback: `POST /api/v1/content/{id}/feedback/` with `{type: "upvote"|"downvote"}`
+- Feedback: `POST /api/v1/tenants/{tenant_id}/feedback/` with `{content: <id>, feedback_type: "upvote"|"downvote"}`
 
 **Definition of done:** User can view dashboard, expand articles, trigger skills, see results inline, upvote/downvote content, manage entities and sources.
 

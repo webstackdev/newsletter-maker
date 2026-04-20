@@ -582,7 +582,7 @@ The Docker Compose setup naturally translates to Kubernetes manifests or a Helm 
 
    **Backend implementation:**
 
-   - **API endpoint:** `POST /api/v1/content/{id}/skills/{skill_name}/` — triggers the skill, returns a `SkillResult` object with status (pending/running/completed/failed), result data, and metadata (model used, latency, confidence).
+    - **API endpoint:** `POST /api/v1/tenants/{tenant_id}/contents/{id}/skills/{skill_name}/` — triggers the skill, returns a `SkillResult` object with status (pending/running/completed/failed), result data, and metadata (model used, latency, confidence).
    - **Async execution:** Skills that take >1s (summarization, entity extraction) should run via Celery and return a `202 Accepted` with a result ID. The frontend polls or uses WebSocket for completion. Classification and relevance explanations are fast enough for synchronous response.
    - **Error handling:** If a skill fails (model timeout, malformed input), the API returns the error in the `SkillResult` with status `failed` and a user-readable message. The UI shows an inline error with a "Retry" button. No silent failures.
    - **Django models:**

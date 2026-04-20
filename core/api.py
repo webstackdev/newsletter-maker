@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.exceptions import NotFound
 
 from core.models import Content, Entity, IngestionRun, ReviewQueue, SkillResult, Tenant, TenantConfig, UserFeedback
 from core.serializers import (
@@ -16,11 +17,28 @@ from core.serializers import (
 class TenantOwnedQuerysetMixin:
     queryset = None
 
+    def get_tenant(self):
+        tenant_id = self.kwargs.get("tenant_id")
+        if tenant_id is None:
+            raise AssertionError("tenant_id must be present in nested tenant-scoped routes")
+        try:
+            return Tenant.objects.get(pk=tenant_id, user=self.request.user)
+        except Tenant.DoesNotExist as exc:
+            raise NotFound("Tenant not found.") from exc
+
     def get_queryset(self):
         queryset = self.queryset
         if queryset is None:
             raise AssertionError("queryset must be set on tenant-scoped viewsets")
-        return queryset.filter(tenant__user=self.request.user)
+        return queryset.filter(tenant=self.get_tenant())
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["tenant"] = self.get_tenant()
+        return context
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.get_tenant())
 
 
 class TenantViewSet(viewsets.ModelViewSet):
@@ -59,7 +77,7 @@ class UserFeedbackViewSet(TenantOwnedQuerysetMixin, viewsets.ModelViewSet):
     queryset = UserFeedback.objects.select_related("content", "tenant", "user")
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save(tenant=self.get_tenant(), user=self.request.user)
 
 
 class IngestionRunViewSet(TenantOwnedQuerysetMixin, viewsets.ModelViewSet):

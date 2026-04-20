@@ -40,12 +40,6 @@ Set up the Django project, Docker infrastructure, and development environment.
 
 **Definition of done:** `just dev` brings up all services, `/healthz/` returns 200, Django admin is accessible.
 
-Natural next steps:
-
-- Start WP2 by defining the initial models and admin registration.
-- Add a minimal DRF API namespace now so WP2 serializers/viewsets land into a stable structure.
-- Run the full container stack with docker compose up --build after installing just or directly via Docker.
-
 ### WP2: Data Models
 
 Core Django models for multi-tenant content management.
@@ -162,12 +156,6 @@ class ReviewQueue(models.Model):
 
 **Definition of done:** Models migrated, Django admin registered, API endpoints return JSON for all models, tenant scoping enforced.
 
-Natural next steps:
-
-- Add a small authenticated smoke test for each new endpoint shape, not just tenant scoping.
-- Decide whether Tenant.user should remain one-to-many or become one-to-one for the MVP.
-- Start WP3 by adding SourceConfig plus the first RSS ingestion path.
-
 ### WP3: Data Source Plugins (RSS + Reddit)
 
 Implement the plugin interface and the two Phase 1 plugins.
@@ -184,6 +172,7 @@ class SourcePlugin(ABC):
 ```
 
 **RSS plugin:**
+
 - Uses `feedparser` to fetch configured feed URLs
 - Stores seen entry GUIDs to avoid re-ingesting duplicates
 - Extracts: URL, title, author, published date, summary/excerpt
@@ -191,6 +180,7 @@ class SourcePlugin(ABC):
 - Scheduled via Celery Beat: every 6 hours
 
 **Reddit plugin:**
+
 - Uses PRAW (Python Reddit API Wrapper)
 - Monitors configured subreddits via `.new()` and `.hot()`
 - Extracts: title, selftext, URL, score, subreddit, author
@@ -210,6 +200,7 @@ class SourceConfig(models.Model):
 ```
 
 **Celery tasks:**
+
 - `run_ingestion(tenant_id, plugin_name)` — fetches new content, creates `Content` records, logs `IngestionRun`
 - `run_all_ingestions()` — Beat-scheduled task that triggers ingestion for all active source configs
 
@@ -224,22 +215,26 @@ Compute embeddings for all ingested content and store them in Qdrant for similar
 **Embedding model:** Local, free — `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions) or `nomic-embed-text` via Ollama (768 dimensions). Configurable via `EMBEDDING_MODEL` env var.
 
 **Qdrant setup:**
+
 - One collection per tenant (named `tenant_{id}_content`)
 - HNSW index for fast similarity search
 - Each point stores: vector, plus payload metadata (content ID, URL, title, published date, source plugin)
 
 **Integration flow:**
+
 1. Plugin fetches article → `Content` record created in Postgres
 2. Post-save signal (or inline in ingestion task) computes embedding
 3. Embedding + metadata upserted into tenant's Qdrant collection
 4. `Content.embedding_id` stores the Qdrant point ID for later retrieval
 
 **Reference corpus seeding:**
+
 - Each tenant's Qdrant collection is initialized with embeddings from reference articles that define "what's relevant" for this newsletter
 - Seed script pre-populates with ~50-100 sample articles per tenant
 - These reference embeddings serve as the relevance baseline for the scoring skill
 
 **Utility functions:**
+
 - `embed_text(text: str) -> list[float]` — compute embedding for a text string
 - `upsert_content_embedding(content: Content)` — embed and store in Qdrant
 - `search_similar(tenant_id: int, query_vector: list[float], limit: int) -> list[ScoredPoint]` — find similar content
@@ -255,7 +250,7 @@ Implement the three Phase 1 skills and wire them into a LangGraph orchestrator.
 
 **Skill format:** Each skill lives in a `skills/{skill_name}/` directory following Claude-style progressive disclosure:
 
-```
+```bash
 skills/
 ├── content_classification/
 │   ├── SKILL.md          # YAML frontmatter (Level 1) + SOP instructions (Level 2)
@@ -271,19 +266,22 @@ skills/
 **Skill implementations (Python wrappers around the prompt + model call):**
 
 **1. Content Classification** (Llama 3.1 70B via OpenRouter)
+
 - Input: `{title, content_text, url}`
 - Output: `{content_type: str, confidence: float}`
 - Categories: technical_article, tutorial, opinion, product_announcement, event, release_notes, other
 - If `confidence < 0.6`: add to `ReviewQueue` with reason `low_confidence_classification`
 
 **2. Relevance Scoring** (Embeddings primary, Qwen 2.5 72B for borderline)
+
 - Input: `{content_embedding, tenant_id}`
 - Step 1: Compute cosine similarity against tenant's reference corpus in Qdrant
-- Step 2: If similarity > 0.85 → score = similarity (no LLM call). If similarity < 0.5 → score = similarity (no LLM call). If 0.5–0.85 → call Qwen for nuanced judgment with explanation.
+- Step 2: If similarity > 0.85 → score = similarity (no LLM call). If similarity < 0.5 → score = similarity (no LLM call). If 0.5 - 0.85 → call Qwen for nuanced judgment with explanation.
 - Output: `{relevance_score: float, explanation: str, used_llm: bool}`
 - If `0.4 < relevance_score < 0.7`: add to `ReviewQueue` with reason `borderline_relevance`
 
 **3. Summarization** (Gemma 3 27B via OpenRouter)
+
 - Input: `{title, content_text, newsletter_topic}`
 - Output: `{summary: str}` (2-3 sentences, newsletter-ready)
 - Only runs on content with `relevance_score >= 0.7`
@@ -324,16 +322,19 @@ def build_ingestion_graph():
 ```
 
 **Routing logic:**
+
 - `relevance_score >= 0.7` → summarize → surface in dashboard
 - `0.4 <= relevance_score < 0.7` → queue for human review (surfaced with "Low confidence" flag)
 - `relevance_score < 0.4` → archive (soft-delete, `is_active = False`)
 
 **Error handling:**
+
 - Each node wrapped in try/except; failures logged as `SkillResult` with `status=failed`
 - Max 2 retries per node before marking as failed and moving to review queue
 - Circuit breaker: after 5 consecutive failures on a skill, pause pipeline and alert via log
 
 **Celery integration:**
+
 - `process_content(content_id)` — Celery task that runs the LangGraph pipeline for one content item
 - Called automatically after ingestion creates a new `Content` record
 - State checkpointed in Redis — if worker dies mid-pipeline, resumes from last completed node
@@ -378,12 +379,13 @@ A focused UI for reviewing and acting on surfaced content.
    - Per-source health status
 
 **API integration:**
+
 - All data fetched via DRF endpoints
-- Skill invocations: `POST /api/v1/content/{id}/skills/{skill_name}/`
+- Skill invocations: `POST /api/v1/tenants/{tenant_id}/contents/{id}/skills/{skill_name}/`
   - Returns `202 Accepted` for async skills (summarization)
-  - Frontend polls `GET /api/v1/skill-results/{id}/` until `status=completed`
+    - Frontend polls `GET /api/v1/tenants/{tenant_id}/skill-results/{id}/` until `status=completed`
   - Returns `200` with result for fast skills (find related via Qdrant)
-- Feedback: `POST /api/v1/content/{id}/feedback/` with `{type: "upvote"|"downvote"}`
+- Feedback: `POST /api/v1/tenants/{tenant_id}/feedback/` with `{content: <id>, feedback_type: "upvote"|"downvote"}`
 
 **Definition of done:** User can view dashboard, expand articles, trigger skills, see results inline, upvote/downvote content, manage entities and sources.
 
@@ -418,7 +420,7 @@ Make the project immediately demo-able without weeks of data accumulation.
 
 ### Work Package Dependencies
 
-```
+```bash
 WP1 (Scaffold)
  └─► WP2 (Models)
       ├─► WP3 (Plugins)
@@ -459,4 +461,3 @@ WP6 (Frontend) can begin in parallel with WP3-WP5 once models and API endpoints 
 - Prometheus / Grafana / external observability → Phase 3+
 - Kubernetes deployment → Phase 2+
 - CI/CD beyond basic GitHub Actions → Phase 2+
-

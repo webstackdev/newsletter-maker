@@ -4,14 +4,17 @@
     "buildx",
     "gunicorn",
     "healthz",
+    "HNSW",
     "isready",
     "libpq",
     "noinput",
     "nomic",
+    "PRAW",
     "PYTHONDONTWRITEBYTECODE",
     "PYTHONUNBUFFERED",
     "QDRANT",
     "readyz",
+    "upserted",
     "upvote"
   ]
 }
