@@ -81,8 +81,8 @@ The system is designed for graceful failure, not silent corruption. Unparseable 
 ## Local Development
 
 ```bash
-python3 -m venv newsletter-maker
-source newsletter-maker/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 

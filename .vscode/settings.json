@@ -11,6 +11,7 @@
     "PYTHONDONTWRITEBYTECODE",
     "PYTHONUNBUFFERED",
     "QDRANT",
-    "readyz"
+    "readyz",
+    "upvote"
   ]
 }

@@ -162,7 +162,11 @@ class ReviewQueue(models.Model):
 
 **Definition of done:** Models migrated, Django admin registered, API endpoints return JSON for all models, tenant scoping enforced.
 
----
+Natural next steps:
+
+- Add a small authenticated smoke test for each new endpoint shape, not just tenant scoping.
+- Decide whether Tenant.user should remain one-to-many or become one-to-one for the MVP.
+- Start WP3 by adding SourceConfig plus the first RSS ingestion path.
 
 ### WP3: Data Source Plugins (RSS + Reddit)
 
