@@ -23,8 +23,8 @@ class EntityAdmin(admin.ModelAdmin):
 
 @admin.register(Content)
 class ContentAdmin(admin.ModelAdmin):
-	list_display = ("title", "tenant", "source_plugin", "published_date", "relevance_score", "is_active")
-	list_filter = ("tenant", "source_plugin", "is_active")
+	list_display = ("title", "tenant", "source_plugin", "published_date", "relevance_score", "is_reference", "is_active")
+	list_filter = ("tenant", "source_plugin", "is_reference", "is_active")
 	search_fields = ("title", "author", "url")
 
 

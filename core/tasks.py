@@ -4,6 +4,7 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
+from core.embeddings import upsert_content_embedding
 from core.models import Content, IngestionRun, RunStatus, SourceConfig
 from core.plugins import get_plugin_for_source_config
 
@@ -55,7 +56,7 @@ def _ingest_source_config(source_config: SourceConfig) -> tuple[int, int]:
     for item in fetched_items:
         if Content.objects.filter(tenant=source_config.tenant, url=item.url).exists():
             continue
-        Content.objects.create(
+        content = Content.objects.create(
             tenant=source_config.tenant,
             entity=plugin.match_entity_for_url(item.url),
             url=item.url,
@@ -65,6 +66,7 @@ def _ingest_source_config(source_config: SourceConfig) -> tuple[int, int]:
             published_date=item.published_date,
             content_text=item.content_text,
         )
+        upsert_content_embedding(content)
         ingested_count += 1
     source_config.last_fetched_at = timezone.now()
     source_config.save(update_fields=["last_fetched_at"])

@@ -6,6 +6,22 @@ dev:
     if [ ! -f .env ]; then cp .env.example .env; fi
     {{compose}} up --build
 
+build:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} build
+
+build-django:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} build django
+
+up:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} up
+
+up-detached:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} up -d
+
 stop:
     if [ ! -f .env ]; then cp .env.example .env; fi
     {{compose}} down
@@ -14,6 +30,16 @@ restart:
     if [ ! -f .env ]; then cp .env.example .env; fi
     {{compose}} down
     {{compose}} up --build
+
+restart-no-build:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} down
+    {{compose}} up
+
+restart-django:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} build django
+    {{compose}} up -d django
 
 createsuperuser:
     if [ ! -f .env ]; then cp .env.example .env; fi
@@ -40,6 +66,22 @@ migrate:
 seed:
     if [ ! -f .env ]; then cp .env.example .env; fi
     python3 manage.py seed_demo
+
+embed-all:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py sync_embeddings
+
+embed-tenant tenant_id:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py sync_embeddings --tenant-id {{tenant_id}}
+
+embed-smoke:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py embedding_smoke
+
+embed-smoke-content content_id:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py embedding_smoke --content-id {{content_id}}
 
 shell:
     if [ ! -f .env ]; then cp .env.example .env; fi

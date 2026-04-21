@@ -7,7 +7,7 @@ import structlog
 from dotenv import load_dotenv
 
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,7 +38,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_API_BASE = os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
+OPENROUTER_APP_URL = os.getenv("OPENROUTER_APP_URL", "")
+OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "newsletter-maker")
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "sentence-transformers")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+EMBEDDING_TRUST_REMOTE_CODE = env_bool("EMBEDDING_TRUST_REMOTE_CODE", default=False)
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "newsletter-maker/0.1")
