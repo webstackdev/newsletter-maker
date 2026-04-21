@@ -41,6 +41,22 @@ seed:
     if [ ! -f .env ]; then cp .env.example .env; fi
     python3 manage.py seed_demo
 
+embed-all:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py sync_embeddings
+
+embed-tenant tenant_id:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py sync_embeddings --tenant-id {{tenant_id}}
+
+embed-smoke:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py embedding_smoke
+
+embed-smoke-content content_id:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    python3 manage.py embedding_smoke --content-id {{content_id}}
+
 shell:
     if [ ! -f .env ]; then cp .env.example .env; fi
     python3 manage.py shell

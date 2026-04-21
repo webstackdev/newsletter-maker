@@ -32,7 +32,9 @@ Set up the Django project, Docker infrastructure, and development environment.
 - `.env.example` with all required environment variables:
   - `DATABASE_URL`, `REDIS_URL`, `QDRANT_URL`
   - `OPENROUTER_API_KEY`
-  - `EMBEDDING_MODEL` (default: `nomic-embed-text` or `all-MiniLM-L6-v2`)
+    - `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`
+    - `OLLAMA_URL` for local Ollama embeddings
+    - `OPENROUTER_API_BASE` for hosted OpenAI-compatible embeddings APIs
   - `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`
 - Health check endpoints: `GET /healthz/` (system health), `GET /readyz/` (DB + Qdrant reachable)
 - `justfile` with commands: `dev` (docker compose up), `test`, `migrate`, `seed`, `shell`
@@ -218,7 +220,18 @@ What is not built yet is the full done state from the plan, especially live feed
 
 Compute embeddings for all ingested content and store them in Qdrant for similarity search.
 
-**Embedding model:** Local, free — `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions) or `nomic-embed-text` via Ollama (768 dimensions). Configurable via `EMBEDDING_MODEL` env var.
+**Embedding backend:** Configurable via `EMBEDDING_PROVIDER` plus `EMBEDDING_MODEL`.
+
+- `sentence-transformers`: local Hugging Face / SentenceTransformers model loading
+- `ollama`: local model served over Ollama's embedding API
+- `openrouter`: hosted embeddings through the OpenRouter `/embeddings` API
+
+Examples:
+
+- `EMBEDDING_PROVIDER=sentence-transformers`, `EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2`
+- `EMBEDDING_PROVIDER=ollama`, `EMBEDDING_MODEL=nomic-embed-text`
+- `EMBEDDING_PROVIDER=ollama`, `EMBEDDING_MODEL=qwen3-embedding-8b`
+- `EMBEDDING_PROVIDER=openrouter`, `EMBEDDING_MODEL=openai/text-embedding-3-small`
 
 **Qdrant setup:**
 
@@ -230,8 +243,9 @@ Compute embeddings for all ingested content and store them in Qdrant for similar
 
 1. Plugin fetches article → `Content` record created in Postgres
 2. Post-save signal (or inline in ingestion task) computes embedding
-3. Embedding + metadata upserted into tenant's Qdrant collection
-4. `Content.embedding_id` stores the Qdrant point ID for later retrieval
+3. The configured embedding provider returns a vector for the content text
+4. Embedding + metadata upserted into tenant's Qdrant collection
+5. `Content.embedding_id` stores the Qdrant point ID for later retrieval
 
 **Reference corpus seeding:**
 
@@ -246,7 +260,16 @@ Compute embeddings for all ingested content and store them in Qdrant for similar
 - `search_similar(tenant_id: int, query_vector: list[float], limit: int) -> list[ScoredPoint]` — find similar content
 - `get_reference_similarity(tenant_id: int, vector: list[float]) -> float` — average similarity against reference corpus
 
+**Operational usage:**
+
+- `just embed-all` — backfill embeddings for all content rows
+- `just embed-tenant <tenant_id>` — backfill one tenant's content
+- `python3 manage.py sync_embeddings --content-id <id>` — re-embed one record
+
 **Definition of done:** Every ingested content item has an embedding in Qdrant. `search_similar` returns semantically related articles. Reference corpus is seeded for test tenant.
+
+- Run `just embed-smoke` to confirm Django can talk to Ollama.
+- If that works, run `just embed-all` or `just embed-tenant <tenant_id>` to backfill real content.
 
 ### WP5: AI Skills + LangGraph Pipeline
 

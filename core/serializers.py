@@ -88,9 +88,11 @@ class ContentSerializer(TenantScopedSerializerMixin, serializers.ModelSerializer
             "ingested_at",
             "content_text",
             "relevance_score",
+            "embedding_id",
+            "is_reference",
             "is_active",
         ]
-        read_only_fields = ["id", "tenant", "ingested_at"]
+        read_only_fields = ["id", "tenant", "ingested_at", "embedding_id"]
 
     def validate(self, attrs):
         tenant = self.context.get("tenant") or attrs.get("tenant") or getattr(self.instance, "tenant", None)

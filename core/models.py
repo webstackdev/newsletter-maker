@@ -105,6 +105,8 @@ class Content(models.Model):
 	ingested_at = models.DateTimeField(auto_now_add=True)
 	content_text = models.TextField()
 	relevance_score = models.FloatField(null=True, blank=True)
+	embedding_id = models.CharField(max_length=64, blank=True)
+	is_reference = models.BooleanField(default=False)
 	is_active = models.BooleanField(default=True)
 
 	class Meta:
@@ -112,6 +114,7 @@ class Content(models.Model):
 		indexes = [
 			models.Index(fields=["tenant", "-published_date"]),
 			models.Index(fields=["tenant", "-relevance_score"]),
+			models.Index(fields=["tenant", "is_reference"]),
 			models.Index(fields=["url"]),
 		]
 

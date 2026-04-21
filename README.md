@@ -92,6 +92,47 @@ python3 -m pip install -r requirements.txt
 
 For host-based development without Docker, install `requirements.txt`, then use `python3 manage.py migrate` and `python3 manage.py runserver`. The default `.env.example` is host-safe; Docker Compose overrides the service URLs inside containers.
 
+### Embedding Backends
+
+The embedding layer is provider-based. Configure it with `EMBEDDING_PROVIDER` and `EMBEDDING_MODEL`:
+
+- `sentence-transformers`: loads a Hugging Face / SentenceTransformers model inside the Django process
+- `ollama`: calls a local Ollama server for embeddings
+- `openrouter`: calls OpenRouter's embeddings API using the configured model id
+
+Common examples:
+
+```dotenv
+EMBEDDING_PROVIDER=sentence-transformers
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+```
+
+```dotenv
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_MODEL=nomic-embed-text
+OLLAMA_URL=http://localhost:11434
+```
+
+```dotenv
+EMBEDDING_PROVIDER=openrouter
+EMBEDDING_MODEL=openai/text-embedding-3-small
+OPENROUTER_API_KEY=...
+OPENROUTER_API_BASE=https://openrouter.ai/api/v1
+```
+
+For SentenceTransformers models that require custom remote code, set `EMBEDDING_TRUST_REMOTE_CODE=true`.
+
+### Embedding Commands
+
+Use these commands to backfill or refresh embeddings for existing content:
+
+```bash
+just embed-all
+just embed-tenant 1
+python3 manage.py sync_embeddings --content-id 42
+python3 manage.py sync_embeddings --references-only
+```
+
 When `just dev` is running, Django admin uses the Postgres database inside Docker, not the host SQLite database. That means host commands like `python manage.py createsuperuser` create users in SQLite and will not let you log into the Docker-backed admin site.
 
 Create or update an admin user for the running Docker stack with:
