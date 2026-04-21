@@ -6,6 +6,15 @@ dev:
     if [ ! -f .env ]; then cp .env.example .env; fi
     {{compose}} up --build
 
+stop:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} down
+
+restart:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    {{compose}} down
+    {{compose}} up --build
+
 createsuperuser:
     if [ ! -f .env ]; then cp .env.example .env; fi
     {{compose}} exec django python manage.py createsuperuser

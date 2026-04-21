@@ -204,7 +204,15 @@ class SourceConfig(models.Model):
 - `run_ingestion(tenant_id, plugin_name)` — fetches new content, creates `Content` records, logs `IngestionRun`
 - `run_all_ingestions()` — Beat-scheduled task that triggers ingestion for all active source configs
 
+**Natural next steps:**
+
+- Add a small management command or just target to trigger run_all_ingestions and run_ingestion manually during development.
+- Add source health reporting so /admin/health or a tenant API endpoint can surface RSS/Reddit plugin status from health_check().
+- Tighten the ingestion contract by storing plugin-specific metadata such as Reddit score/subreddit or RSS entry IDs if you want better deduplication and debugging.
+
 **Definition of done:** RSS plugin ingests from a real feed. Reddit plugin ingests from a real subreddit. `IngestionRun` records log success/failure. Health checks return correct status.
+
+What is not built yet is the full done state from the plan, especially live feed/subreddit wiring in a running stack, source-health UI/endpoints, and richer ingestion metadata/dedup strategy.
 
 ### WP4: Embeddings + Qdrant Integration
 
@@ -239,8 +247,6 @@ Compute embeddings for all ingested content and store them in Qdrant for similar
 - `get_reference_similarity(tenant_id: int, vector: list[float]) -> float` — average similarity against reference corpus
 
 **Definition of done:** Every ingested content item has an embedding in Qdrant. `search_similar` returns semantically related articles. Reference corpus is seeded for test tenant.
-
----
 
 ### WP5: AI Skills + LangGraph Pipeline
 
