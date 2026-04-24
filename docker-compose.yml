@@ -1,18 +1,28 @@
+x-app-common: &app-common
+  image: newsletter-maker-app:dev
+  pull_policy: never
+  env_file:
+    - .env
+  environment:
+    DATABASE_URL: postgresql://newsletter:newsletter@postgres:5432/newsletter_maker
+    REDIS_URL: redis://redis:6379/0
+    QDRANT_URL: http://qdrant:6333
+  volumes:
+    - .:/app
+    - static_data:/app/staticfiles
+
 services:
   django:
+    <<: *app-common
     build:
       context: .
       dockerfile: docker/web/Dockerfile
-    env_file:
-      - .env
     environment:
       BOOTSTRAP_APP: "true"
       DATABASE_URL: postgresql://newsletter:newsletter@postgres:5432/newsletter_maker
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
     command: ["gunicorn", "newsletter_maker.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
-    volumes:
-      - static_data:/app/staticfiles
     depends_on:
       postgres:
         condition: service_healthy
@@ -27,11 +37,7 @@ services:
       retries: 5
 
   celery-worker:
-    build:
-      context: .
-      dockerfile: docker/web/Dockerfile
-    env_file:
-      - .env
+    <<: *app-common
     environment:
       BOOTSTRAP_APP: "false"
       DATABASE_URL: postgresql://newsletter:newsletter@postgres:5432/newsletter_maker
@@ -43,15 +49,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - static_data:/app/staticfiles
 
   celery-beat:
-    build:
-      context: .
-      dockerfile: docker/web/Dockerfile
-    env_file:
-      - .env
+    <<: *app-common
     environment:
       BOOTSTRAP_APP: "false"
       DATABASE_URL: postgresql://newsletter:newsletter@postgres:5432/newsletter_maker
@@ -63,8 +63,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - static_data:/app/staticfiles
 
   postgres:
     image: postgres:16

@@ -1,5 +1,7 @@
 # Newsletter Maker
 
+![Image of AI-powered newsletter workflow](readme.jpg)
+
 An AI-powered content curation platform for technically-oriented newsletters. Newsletter Maker ingests content from dozens of sources, builds authority models of people and companies in a domain, and surfaces the most relevant articles, trends, and themes for each edition — so editors spend their time writing, not searching.
 
 The system is multi-tenant: each newsletter has its own tracked entities, relevance model, and content pipeline. Designed for non-technical editors who don't know what a vector database is and don't need to.
@@ -24,13 +26,25 @@ Every AI capability is a standalone, documented module following the Claude Skil
 2. **Instructions layer** — the full standard operating procedure for the task
 3. **Resources layer** — deterministic scripts, reference data, and templates
 
-Seven skills form the core pipeline: Content Classification, Relevance Scoring, Deduplication, Summarization, Theme Detection, Newsletter Email Extraction, and Entity Extraction. Each has a defined input/output schema and is independently invocable — from the pipeline, from the UI, or chained into user-defined workflows.
+Seven skills form the core pipeline:
 
-The skill format is model-agnostic. The same skill definitions work with Claude, GPT, and local models via Ollama. The model is a configuration parameter, not a hardcoded dependency.
+| Skill | Description |
+|-------|-------------|
+| **Content Classification** | Categorizes raw content (e.g., tutorial, opinion, release notes) and assigns a confidence score. |
+| **Relevance Scoring** | Evaluates content usefulness using semantic similarity against a reference corpus and LLM judgment. |
+| **Deduplication** | Compares new content against recent embeddings to group similar topics and pick the best version. |
+| **Summarization** | Generates a concise, newsletter-ready summary for editors to use or tweak directly. |
+| **Theme Detection** | Analyzes recent content to identify emerging trends and suggest them as newsletter sections. |
+| **Newsletter Email Extraction** | Parses raw inbound newsletter HTML to extract structured links, titles, authors, and descriptions. |
+| **Entity Extraction** | Identifies people, companies, and organizations in content to build out the unified entity model. |
+
+Each has a defined input/output schema and is independently invocable — from the pipeline, from the UI, or chained into user-defined workflows.
+
+The skill format is model-agnostic. The same skill definitions work with Claude, GPT, Qwen, Llama, DeepSeek, Command R+, and Gemma. Models can be used via API calls like OpenRouter or locally via Ollama. The model is a configuration parameter, not a hard coded dependency. There are recommended models to use with each skill based on suitability and cost.
 
 ### LangGraph Orchestration
 
-Skills are composed into workflows by LangGraph, which provides what skills alone can't: deterministic routing, state persistence, conditional edges, and human-in-the-loop checkpoints. If the ingestion pipeline fails at step 3 of 5, it resumes from that checkpoint rather than reprocessing from scratch.
+Skills are composed into workflows by LangGraph to provide deterministic routing, state persistence, conditional edges, and human-in-the-loop checkpoints. If the ingestion pipeline fails at step 3 of 5, it resumes from that checkpoint rather than reprocessing from scratch.
 
 The orchestrator handles multi-model routing — each skill uses a model chosen for the task (Qwen for structured extraction and dev-time grounding, Gemma for clean summarization prose, DeepSeek for cross-document reasoning, Command R+ for production RAG scoring). During development, all models are accessed via OpenRouter as a unified API gateway at ~$2.30/month. In production, every selected model is self-hostable via Ollama for zero marginal LLM cost.
 
@@ -86,9 +100,10 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-1. Run `just dev` to build the Django image and start Django, Celery, Postgres, Redis, Qdrant, and Nginx. If `.env` is missing, the `just` command copies `.env.example` automatically.
-2. Update `.env` with non-default secrets before using the stack outside local development. The example file uses SQLite and localhost URLs so host-side `manage.py` commands work even without Docker.
-3. Open `http://localhost:8080/healthz/` for a liveness check and `http://localhost:8080/admin/` for Django admin.
+1. Run `just dev` to start Django, Celery, Postgres, Redis, Qdrant, and Nginx. On the first run Docker builds the app image automatically. After that, `just dev` reuses the existing image so normal restarts are fast. If `.env` is missing, the `just` command copies `.env.example` automatically.
+2. Run `just build` after changing `requirements.txt` or `docker/web/Dockerfile`.
+3. Update `.env` with non-default secrets before using the stack outside local development. The example file uses SQLite and localhost URLs so host-side `manage.py` commands work even without Docker.
+4. Open `http://localhost:8080/healthz/` for a liveness check and `http://localhost:8080/admin/` for Django admin.
 
 For host-based development without Docker, install `requirements.txt`, then use `python3 manage.py migrate` and `python3 manage.py runserver`. The default `.env.example` is host-safe; Docker Compose overrides the service URLs inside containers.
 
@@ -144,7 +159,9 @@ just changepassword your-username
 
 For the default local bootstrap, `.env` also seeds an `admin` superuser in the container database using `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, and `DJANGO_SUPERUSER_PASSWORD`.
 
-- [PLANNING.md](docs/PLANNING.md) — Full architecture decisions, data model, and feedback loop design
-- [VENDOR.md](docs/VENDOR.md) — Per-skill model selection, rationale, and API pricing
-- [GENRES.md](docs/GENRES.md) — Newsletter format types and layout templates
-- [IMPLEMENTATION.md](docs/IMPLEMENTATION.md) — Additional implementation notes
+## Documentation
+
+- [PLANNING.md](docs/PLANNING.md) - Full architecture decisions, data model, and feedback loop design
+- [VENDOR.md](docs/VENDOR.md) - Per-skill model selection, rationale, and API pricing
+- [GENRES.md](docs/GENRES.md) - Newsletter format types and layout templates
+- [IMPLEMENTATION.md](docs/IMPLEMENTATION.md) - Additional implementation notes

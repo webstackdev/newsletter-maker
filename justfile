@@ -4,7 +4,7 @@ compose := "docker compose"
 
 dev:
     if [ ! -f .env ]; then cp .env.example .env; fi
-    {{compose}} up --build
+    {{compose}} up
 
 build:
     if [ ! -f .env ]; then cp .env.example .env; fi

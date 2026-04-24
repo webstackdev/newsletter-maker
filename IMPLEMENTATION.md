@@ -271,6 +271,12 @@ Examples:
 - Run `just embed-smoke` to confirm Django can talk to Ollama.
 - If that works, run `just embed-all` or `just embed-tenant <tenant_id>` to backfill real content.
 
+Natural next steps:
+
+- add a DRF endpoint or admin action that returns similar content for a given item using search_similar_content
+- expand the seeded reference corpus from the current minimal set into a more realistic tenant baseline
+- wire WP5 relevance scoring to get_reference_similarity and the seeded reference items
+
 ### WP5: AI Skills + LangGraph Pipeline
 
 Implement the three Phase 1 skills and wire them into a LangGraph orchestrator.

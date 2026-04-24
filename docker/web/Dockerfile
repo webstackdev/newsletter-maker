@@ -17,4 +17,4 @@ COPY . .
 
 RUN chmod +x docker/web/entrypoint.sh
 
-ENTRYPOINT ["./docker/web/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "./docker/web/entrypoint.sh"]

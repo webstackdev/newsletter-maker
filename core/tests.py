@@ -11,13 +11,19 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core import embeddings
-from core.embeddings import get_embedding_provider, get_reference_similarity, search_similar, upsert_content_embedding
+from core.embeddings import get_embedding_provider, get_reference_similarity, search_similar, search_similar_content, upsert_content_embedding
 from core.models import Content, Entity, FeedbackType, Tenant, UserFeedback
 from core.models import IngestionRun, ReviewQueue, ReviewReason, RunStatus, SkillResult, SkillStatus, SourceConfig, SourcePluginName, TenantConfig
 from core.tasks import run_all_ingestions, run_ingestion
 
 
 class HealthCheckTests(TestCase):
+    def test_root_redirects_to_admin(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/admin/")
+
     def test_healthz_returns_ok(self):
         response = self.client.get("/healthz/")
 
@@ -461,6 +467,21 @@ class EmbeddingIntegrationTests(TestCase):
         self.assertEqual(results, [scored_point])
         client_mock.return_value.search.assert_called_once()
 
+    @patch("core.embeddings.embed_text", return_value=[0.3, 0.2, 0.1])
+    @patch("core.embeddings.search_similar", return_value=[SimpleNamespace(score=0.88, payload={"content_id": 999})])
+    def test_search_similar_content_embeds_current_content_and_excludes_self(self, search_similar_mock, embed_text_mock):
+        results = search_similar_content(self.content, limit=4, is_reference=False)
+
+        self.assertEqual(len(results), 1)
+        embed_text_mock.assert_called_once_with("Embedding Content\n\nThis article covers platform engineering practices.")
+        search_similar_mock.assert_called_once_with(
+            self.tenant.id,
+            [0.3, 0.2, 0.1],
+            limit=4,
+            is_reference=False,
+            exclude_content_id=self.content.id,
+        )
+
     @patch("core.embeddings.search_similar")
     def test_get_reference_similarity_averages_reference_scores(self, search_mock):
         search_mock.return_value = [SimpleNamespace(score=0.8), SimpleNamespace(score=0.6)]
@@ -541,3 +562,15 @@ class EmbeddingIntegrationTests(TestCase):
         upsert_mock.assert_called_once()
         written_output = "".join(call.args[0] for call in stdout_mock.write.call_args_list if call.args)
         self.assertIn("embedding-123", written_output)
+
+    @patch("core.management.commands.seed_demo.upsert_content_embedding")
+    def test_seed_demo_creates_reference_corpus_and_embeds_demo_content(self, upsert_mock):
+        with patch("sys.stdout") as stdout_mock:
+            call_command("seed_demo")
+
+        tenant = Tenant.objects.get(name="Platform Engineering Weekly")
+        self.assertTrue(Content.objects.filter(tenant=tenant, is_reference=True).exists())
+        self.assertTrue(Content.objects.filter(tenant=tenant, is_reference=False).exists())
+        self.assertEqual(upsert_mock.call_count, Content.objects.filter(tenant=tenant).count())
+        written_output = "".join(call.args[0] for call in stdout_mock.write.call_args_list if call.args)
+        self.assertIn("Reference corpus items", written_output)

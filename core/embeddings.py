@@ -162,6 +162,16 @@ def search_similar(
     )
 
 
+def search_similar_content(content: Content, limit: int = 10, *, is_reference: bool | None = None):
+    return search_similar(
+        content.tenant_id,
+        embed_text(build_content_embedding_text(content)),
+        limit=limit,
+        is_reference=is_reference,
+        exclude_content_id=content.id,
+    )
+
+
 def get_reference_similarity(tenant_id: int, vector: list[float], limit: int = 5) -> float:
     scored_points = search_similar(tenant_id, vector, limit=limit, is_reference=True)
     if not scored_points:
