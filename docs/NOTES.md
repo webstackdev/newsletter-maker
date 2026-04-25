@@ -114,15 +114,3 @@ If your primary bottleneck is the time spent reading 50 articles to find the 5 t
 - **Make.com:** Visual AI workflow automation platform. You can build a scenario that watches your RSS feeds and social mentions, sends them to **OpenAI/Claude** to generate a 2-sentence summary and a "relevance score," and then dumps the winners into a **Notion** board or **Airtable** for your final review.
 
 - **n8n**: A low-code tool frequently used to build custom newsletter summarizers. You can create a workflow that monitors your RSS feeds, sends new content to an LLM (like GPT-4 or Claude) for a technical summary, and stores the results in a JSON file or Airtable.
-
-## Containers
-
-celery-beat
-celery-worker
-django
-nginx
-postgres
-qdrant
-redis
-
-newsletter-maker

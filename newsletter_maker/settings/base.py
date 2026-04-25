@@ -1,19 +1,17 @@
-import logging
 import os
 from pathlib import Path
 
 import dj_database_url
-import structlog
 from dotenv import load_dotenv
 
 
 load_dotenv()
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-
+# Helpers: environment variables always arrive as strings. These helpers coerce
+# common boolean and comma-separated list values into the Python types Django
+# actually expects.
 def env_bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -26,29 +24,21 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
+# Fallback: this default keeps local development bootable even if .env has not
+# been created yet. Production should still provide a real secret.
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-secret-key")
 DEBUG = env_bool("DEBUG", default=True)
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default="localhost,127.0.0.1")
+
 CSRF_TRUSTED_ORIGINS = env_list(
     "CSRF_TRUSTED_ORIGINS",
     default="http://localhost,http://127.0.0.1,http://localhost:8080,http://127.0.0.1:8080",
 )
 
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_API_BASE = os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
-OPENROUTER_APP_URL = os.getenv("OPENROUTER_APP_URL", "")
-OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "newsletter-maker")
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "sentence-transformers")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-EMBEDDING_TRUST_REMOTE_CODE = env_bool("EMBEDDING_TRUST_REMOTE_CODE", default=False)
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "newsletter-maker/0.1")
-
 
 INSTALLED_APPS = [
     "core",
@@ -90,9 +80,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "newsletter_maker.wsgi.application"
 
-
 DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)}
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -109,19 +97,16 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
-
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# DRF: the API defaults to authenticated access so browser sessions and basic
+# auth work locally, but anonymous requests are rejected.
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -132,60 +117,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-CELERY_BROKER_URL = REDIS_URL
-CELERY_RESULT_BACKEND = REDIS_URL
-CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", default=False)
-CELERY_TASK_TIME_LIMIT = 300
-CELERY_TASK_SOFT_TIME_LIMIT = 270
-CELERY_BEAT_SCHEDULE = {
-    "run-all-source-ingestions-every-6-hours": {
-        "task": "core.tasks.run_all_ingestions",
-        "schedule": 60 * 60 * 6,
-    },
-}
-
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
-
-
-structlog.configure(
-    processors=[
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso", utc=True),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.JSONRenderer(),
-    ],
-    logger_factory=structlog.PrintLoggerFactory(),
-    wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, LOG_LEVEL.upper(), logging.INFO)),
-    cache_logger_on_first_use=True,
-)
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "json": {
-            "()": structlog.stdlib.ProcessorFormatter,
-            "processor": structlog.processors.JSONRenderer(),
-            "foreign_pre_chain": [
-                structlog.contextvars.merge_contextvars,
-                structlog.processors.add_log_level,
-                structlog.processors.TimeStamper(fmt="iso", utc=True),
-            ],
-        }
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "json",
-        }
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": LOG_LEVEL,
-    },
-}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
