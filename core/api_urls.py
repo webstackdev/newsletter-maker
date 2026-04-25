@@ -23,30 +23,37 @@ tenant_config_list = TenantConfigViewSet.as_view({"get": "list", "post": "create
 tenant_config_detail = TenantConfigViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
+
 entity_list = EntityViewSet.as_view({"get": "list", "post": "create"})
 entity_detail = EntityViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
+
 content_list = ContentViewSet.as_view({"get": "list", "post": "create"})
 content_detail = ContentViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
+
 skill_result_list = SkillResultViewSet.as_view({"get": "list", "post": "create"})
 skill_result_detail = SkillResultViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
+
 feedback_list = UserFeedbackViewSet.as_view({"get": "list", "post": "create"})
 feedback_detail = UserFeedbackViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
+
 ingestion_run_list = IngestionRunViewSet.as_view({"get": "list", "post": "create"})
 ingestion_run_detail = IngestionRunViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
+
 source_config_list = SourceConfigViewSet.as_view({"get": "list", "post": "create"})
 source_config_detail = SourceConfigViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
 )
+
 review_queue_list = ReviewQueueViewSet.as_view({"get": "list", "post": "create"})
 review_queue_detail = ReviewQueueViewSet.as_view(
     {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}

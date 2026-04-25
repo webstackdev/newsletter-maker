@@ -5,6 +5,7 @@
     "gunicorn",
     "healthz",
     "HNSW",
+    "httpx",
     "isready",
     "libpq",
     "mday",
@@ -12,10 +13,12 @@
     "nomic",
     "OLLAMA",
     "PRAW",
+    "psycopg",
     "PYTHONDONTWRITEBYTECODE",
     "PYTHONUNBUFFERED",
     "QDRANT",
     "readyz",
+    "Referer",
     "upserted",
     "upvote"
   ]

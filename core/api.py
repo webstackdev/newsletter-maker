@@ -1,7 +1,17 @@
 from rest_framework import viewsets
 from rest_framework.exceptions import NotFound
 
-from core.models import Content, Entity, IngestionRun, ReviewQueue, SkillResult, SourceConfig, Tenant, TenantConfig, UserFeedback
+from core.models import (
+    Content,
+    Entity,
+    IngestionRun,
+    ReviewQueue,
+    SkillResult,
+    SourceConfig,
+    Tenant,
+    TenantConfig,
+    UserFeedback
+)
 from core.serializers import (
     ContentSerializer,
     EntitySerializer,

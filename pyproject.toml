@@ -1,0 +1,8 @@
+[tool.isort]
+# Mode 3 = Vertical Hanging Indent (matches your example)
+multi_line_output = 3
+# Forces a wrap as soon as you have more than X imports (set to 2 or 1)
+force_grid_wrap = 2
+# Modern standards (matches 'Black' formatter style)
+include_trailing_comma = true
+use_parentheses = true

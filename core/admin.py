@@ -1,6 +1,16 @@
 from django.contrib import admin
 
-from core.models import Content, Entity, IngestionRun, ReviewQueue, SkillResult, SourceConfig, Tenant, TenantConfig, UserFeedback
+from core.models import (
+    Content,
+    Entity,
+    IngestionRun,
+    ReviewQueue,
+    SkillResult,
+    SourceConfig,
+    Tenant,
+    TenantConfig,
+    UserFeedback,
+)
 
 
 @admin.register(Tenant)
