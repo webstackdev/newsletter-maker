@@ -1,0 +1,60 @@
+name: Branch Protection
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  check-branch-name:
+    name: Validate Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming convention
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          : "${BRANCH_NAME:?github.head_ref is required}"
+
+          HUMAN_BRANCH_REGEX='^(bugfix|hotfix|feature|infrastructure|maintenance|content)/[a-z0-9-]+$'
+          DEPENDABOT_BRANCH_REGEX='^dependabot/[a-z0-9._/-]+$'
+
+          # Human branches use a strict single-segment slug; dependabot branches are machine-generated and may include
+          # nested path segments, underscores, and dots (for package manager + dependency + version details).
+          if [[ ! $BRANCH_NAME =~ $HUMAN_BRANCH_REGEX && ! $BRANCH_NAME =~ $DEPENDABOT_BRANCH_REGEX ]]; then
+            echo "❌ Invalid branch name: $BRANCH_NAME"
+            echo ""
+            echo "Branch names must follow one of these patterns:"
+            echo "  - bugfix/<description>     (e.g., bugfix/fix-navigation-menu)"
+            echo "  - hotfix/<description>     (e.g., hotfix/critical-security-patch)"
+            echo "  - feature/<description>    (e.g., feature/add-contact-form)"
+            echo "  - infrastructure/<desc>    (e.g., infrastructure/setup-ci)"
+            echo "  - maintenance/<desc>       (e.g., maintenance/update-dependencies)"
+            echo "  - content/<description>    (e.g., content/update-about-page)"
+            echo "  - dependabot/<...>         (machine generated; may include '/' '_' '.')"
+            echo ""
+            echo "For non-dependabot branches, use lowercase letters, numbers, and hyphens only."
+            exit 1
+          fi
+
+          echo "✅ Branch name is valid: $BRANCH_NAME"
+
+  check-pr-target:
+    name: Enforce PR Target
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR targets main
+        env:
+          TARGET_BRANCH: ${{ github.base_ref }}
+        run: |
+          : "${TARGET_BRANCH:?github.base_ref is required}"
+
+          if [[ "$TARGET_BRANCH" != "main" ]]; then
+            echo "❌ Pull requests must target 'main'. Received '$TARGET_BRANCH'."
+            echo "Create a branch such as feature/<description> or bugfix/<description> and open the PR against main."
+            exit 1
+          else
+            echo "✅ PR correctly targets 'main' branch"
+          fi
