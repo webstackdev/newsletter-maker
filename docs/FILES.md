@@ -360,35 +360,7 @@ Would you like to see how the **Serializers** use that `context["tenant"]` we ad
 
 ## Improving Tests
 
-### Mocks
-
-The `pytest-mock` plugin provides a `mocker` fixture that replaces the standard library's `@patch` decorator with a more flexible, functional approach.
-
-Before:
-
-```python
-from unittest.mock import patch
-
-@patch("core.management.commands.seed_demo.upsert_content_embedding")
-def test_seed(self, mock_upsert):
-    mock_upsert.return_value = True
-    # run logic...
-    mock_upsert.assert_called_once()
-```
-
-After:
-
-```python
-def test_seed(mocker):
-    # Patch directly inside the test
-    mock_upsert = mocker.patch("core.management.commands.seed_demo.upsert_content_embedding")
-    
-    mock_upsert.return_value = True
-    # run logic...
-    mock_upsert.assert_called_once()
-```
-
-### Console Output
+### Console Capture
 
 Using `capsys` from pytest and pytest-mock cleans up testing console output.
 
@@ -424,9 +396,9 @@ def test_embedding_smoke_command_can_upsert_content(mocker, capsys, db):
     assert "embedding-123" in captured.out
 ```
 
-### Env Keys
+## Test Env Vars
 
-Before:
+`pytest-django` lets you do this to override Django settings, before:
 
 ```python
 @override_settings(
@@ -450,13 +422,17 @@ def test_openrouter_embedding_provider_calls_embeddings_endpoint(self, post_mock
     self.assertEqual(post_mock.call_args.kwargs["headers"]["Authorization"], "Bearer test-key")
 ```
 
-After:
+Use a `.env.test` file, with a `conftest.py` file in the project root:
 
-```ini
-# pytest.ini
-[pytest]
-env =
-    EMBEDDING_PROVIDER=openrouter
-    OPENROUTER_API_KEY=test-key
+```python
+# conftest.py
+import os
+from dotenv import load_dotenv
+
+def pytest_configure():
+    """
+    This runs before any tests (and before Django setup).
+    It loads the .env.test file into the environment.
+    """
+    load_dotenv(".env.test")
 ```
-

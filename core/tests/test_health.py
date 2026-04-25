@@ -1,33 +1,32 @@
-from unittest.mock import patch
+def test_root_redirects_to_admin(client):
+    response = client.get("/")
 
-from django.test import TestCase
+    assert response.status_code == 302
+    assert response["Location"] == "/admin/"
 
 
-class HealthCheckTests(TestCase):
-    def test_root_redirects_to_admin(self):
-        response = self.client.get("/")
+def test_healthz_returns_ok(client):
+    response = client.get("/healthz/")
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/admin/")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
 
-    def test_healthz_returns_ok(self):
-        response = self.client.get("/healthz/")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "ok")
+def test_readyz_returns_ok_when_dependencies_are_ready(client, mocker):
+    mocker.patch("core.views._check_database", return_value=True)
+    mocker.patch("core.views._check_qdrant", return_value=True)
 
-    @patch("core.views._check_database", return_value=True)
-    @patch("core.views._check_qdrant", return_value=True)
-    def test_readyz_returns_ok_when_dependencies_are_ready(self, qdrant_check, database_check):
-        response = self.client.get("/readyz/")
+    response = client.get("/readyz/")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["checks"], {"database": True, "qdrant": True})
+    assert response.status_code == 200
+    assert response.json()["checks"] == {"database": True, "qdrant": True}
 
-    @patch("core.views._check_database", return_value=True)
-    @patch("core.views._check_qdrant", return_value=False)
-    def test_readyz_returns_service_unavailable_when_dependency_fails(self, qdrant_check, database_check):
-        response = self.client.get("/readyz/")
 
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json()["status"], "degraded")
+def test_readyz_returns_service_unavailable_when_dependency_fails(client, mocker):
+    mocker.patch("core.views._check_database", return_value=True)
+    mocker.patch("core.views._check_qdrant", return_value=False)
+
+    response = client.get("/readyz/")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "degraded"

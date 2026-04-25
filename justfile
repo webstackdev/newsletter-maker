@@ -57,7 +57,7 @@ lint:
     python3 manage.py check
 
 test:
-    python3 manage.py test
+    python3 -m pytest
 
 migrate:
     if [ ! -f .env ]; then cp .env.example .env; fi
