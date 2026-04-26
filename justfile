@@ -59,6 +59,14 @@ lint:
     pre-commit run --all-files trailing-whitespace
     python3 manage.py check
 
+lint-fix:
+    if [ ! -f .env ]; then cp .env.example .env; fi
+    ruff check manage.py core newsletter_maker tests --fix
+    djlint core/templates --reformat
+    pre-commit run --all-files end-of-file-fixer
+    pre-commit run --all-files trailing-whitespace
+    just lint
+
 test:
     python3 -m pytest
 

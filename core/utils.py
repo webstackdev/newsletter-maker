@@ -1,5 +1,7 @@
 from django.db.models import Avg
+
 from .models import TenantConfig
+
 
 def dashboard_callback(request, context):
     # Calculate the average authority weight across all tenants

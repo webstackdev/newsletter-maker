@@ -8,7 +8,6 @@ x-app-common: &app-common
     - .env
   volumes:
     - .:/app
-    - static_data:/app/staticfiles
 
 x-shared-env: &shared-env
   DATABASE_URL: postgresql://newsletter:newsletter@postgres:5432/newsletter_maker
@@ -21,7 +20,7 @@ services:
     environment:
       BOOTSTRAP_APP: "true"
       <<: *shared-env
-    command: ["gunicorn", "newsletter_maker.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+    command: ["gunicorn", "newsletter_maker.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--reload"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,7 +39,7 @@ services:
     environment:
       BOOTSTRAP_APP: "false"
       <<: *shared-env
-    command: ["celery", "-A", "newsletter_maker", "worker", "--loglevel=info"]
+    command: ["watchmedo", "auto-restart", "--directory=.", "--pattern=*.py", "--recursive", "--", "celery", "-A", "newsletter_maker", "worker", "--loglevel=info"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,7 +51,7 @@ services:
     environment:
       BOOTSTRAP_APP: "false"
       <<: *shared-env
-    command: ["celery", "-A", "newsletter_maker", "beat", "--loglevel=info"]
+    command: ["watchmedo", "auto-restart", "--directory=.", "--pattern=*.py", "--recursive", "--", "celery", "-A", "newsletter_maker", "beat", "--loglevel=info"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,10 +97,8 @@ services:
       - "8080:80"
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - static_data:/var/www/static:ro
 
 volumes:
   postgres_data:
   redis_data:
   qdrant_data:
-  static_data:

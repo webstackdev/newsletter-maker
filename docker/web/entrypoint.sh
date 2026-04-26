@@ -3,7 +3,6 @@ set -eu
 
 if [ "${BOOTSTRAP_APP:-false}" = "true" ]; then
   python manage.py migrate --noinput
-  python manage.py collectstatic --noinput
 
   if [ "${DJANGO_SUPERUSER_USERNAME:-}" ] && [ "${DJANGO_SUPERUSER_EMAIL:-}" ] && [ "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
     python manage.py shell <<'PY'

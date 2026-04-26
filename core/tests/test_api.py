@@ -94,6 +94,30 @@ class TenantScopedApiTests(APITestCase):
         )
         self.client.force_authenticate(self.owner)
 
+    def assert_standardized_validation_error(self, payload, attr):
+        self.assertEqual(payload["type"], "validation_error")
+        self.assertTrue(any(error["attr"] == attr for error in payload["errors"]))
+
+    def test_tenant_list_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(reverse("v1:tenant-list"), HTTP_HOST="localhost")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.json(),
+            {
+                "type": "client_error",
+                "errors": [
+                    {
+                        "code": "not_authenticated",
+                        "detail": "Authentication credentials were not provided.",
+                        "attr": None,
+                    }
+                ],
+            },
+        )
+
     def test_tenant_list_is_scoped_to_request_user(self):
         response = self.client.get(reverse("v1:tenant-list"))
 
@@ -139,7 +163,7 @@ class TenantScopedApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("content", response.json())
+        self.assert_standardized_validation_error(response.json(), "content")
 
     def test_content_create_uses_tenant_from_url(self):
         response = self.client.post(
@@ -236,4 +260,4 @@ class TenantScopedApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("config", response.json())
+        self.assert_standardized_validation_error(response.json(), "config")
