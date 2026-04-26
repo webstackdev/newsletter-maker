@@ -8,6 +8,12 @@ repos:
 
   - repo: local
     hooks:
+      - id: frontend-lint
+        name: Frontend Lint
+        files: ^frontend/
+        language: system
+        entry: bash -lc 'cd frontend && npm run lint'
+        pass_filenames: false
       - id: just-lint
         name: just lint
         entry: just lint
