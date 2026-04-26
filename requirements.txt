@@ -9,11 +9,14 @@ django-unfold==0.90.0
 Django==6.0.4
 djangorestframework==3.17.1
 djlint==1.36.4
+drf-nested-routers==0.95.0
+drf-spectacular==0.29.0
 editorconfig==0.17.1
 feedparser==6.0.12
 gunicorn==25.3.0
 httpx==0.28.1
 identify==2.6.19
+inflection==0.5.1
 jsbeautifier==1.15.4
 librt==0.9.0
 mypy==1.20.2
@@ -32,3 +35,5 @@ ruff==0.15.12
 sentence-transformers==5.4.1
 structlog==25.5.0
 types-pyyaml==6.0.12.20260408
+uritemplate==4.2.0
+watchdog==6.0.0

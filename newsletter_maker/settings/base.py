@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "import_export",
     "rest_framework",
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -123,6 +124,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -146,4 +148,12 @@ UNFOLD = {
     ],
     "SITE_ICON": lambda request: static("core/logo.svg"),
     "SITE_SYMBOL": "newsletter",
+}
+
+# Add metadata for Swagger UI
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Newsletter Maker API',
+    'DESCRIPTION': 'API documentation for the newsletter maker app',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
