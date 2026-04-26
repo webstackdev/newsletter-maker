@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from core.embeddings import upsert_content_embedding
 from core.models import Content, IngestionRun, RunStatus, SourceConfig
+from core.pipeline import process_content_pipeline
 from core.plugins import get_plugin_for_source_config
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,11 @@ def run_all_ingestions():
     return len(source_config_ids)
 
 
+@shared_task(name="core.tasks.process_content")
+def process_content(content_id: int):
+    return process_content_pipeline(content_id)
+
+
 def _ingest_source_config(source_config: SourceConfig) -> tuple[int, int]:
     plugin = get_plugin_for_source_config(source_config)
     fetched_items = plugin.fetch_new_content(source_config.last_fetched_at)
@@ -66,6 +72,10 @@ def _ingest_source_config(source_config: SourceConfig) -> tuple[int, int]:
             content_text=item.content_text,
         )
         upsert_content_embedding(content)
+        if settings.CELERY_TASK_ALWAYS_EAGER:
+            process_content(content.id)
+        else:
+            process_content.delay(content.id)
         ingested_count += 1
     source_config.last_fetched_at = timezone.now()
     source_config.save(update_fields=["last_fetched_at"])
