@@ -18,6 +18,7 @@
     "noinput",
     "nomic",
     "OLLAMA",
+    "ormsgpack",
     "PRAW",
     "psycopg",
     "pylint",
@@ -28,6 +29,8 @@
     "readyz",
     "Referer",
     "upserted",
-    "upvote"
+    "upvote",
+    "uritemplate",
+    "xxhash"
   ]
 }

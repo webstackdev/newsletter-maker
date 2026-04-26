@@ -24,6 +24,7 @@ def source_plugin_context(django_user_model):
 
 def test_run_ingestion_creates_content_from_rss_entries(source_plugin_context, mocker):
     upsert_embedding_mock = mocker.patch("core.tasks.upsert_content_embedding")
+    process_content_delay_mock = mocker.patch("core.tasks.process_content.delay")
     parse_mock = mocker.patch("core.plugins.rss.feedparser.parse")
     source_config = SourceConfig.objects.create(
             tenant=source_plugin_context.tenant,
@@ -50,12 +51,14 @@ def test_run_ingestion_creates_content_from_rss_entries(source_plugin_context, m
     assert content.tenant == source_plugin_context.tenant
     assert content.entity == source_plugin_context.entity
     upsert_embedding_mock.assert_called_once_with(content)
+    process_content_delay_mock.assert_called_once_with(content.id)
     assert SourceConfig.objects.get(pk=source_config.id).last_fetched_at is not None
     ingestion_run = IngestionRun.objects.get(tenant=source_plugin_context.tenant, plugin_name=SourcePluginName.RSS)
     assert ingestion_run.status == RunStatus.SUCCESS
 
 def test_run_ingestion_skips_duplicate_urls(source_plugin_context, mocker):
     upsert_embedding_mock = mocker.patch("core.tasks.upsert_content_embedding")
+    process_content_delay_mock = mocker.patch("core.tasks.process_content.delay")
     parse_mock = mocker.patch("core.plugins.rss.feedparser.parse")
     source_config = SourceConfig.objects.create(
             tenant=source_plugin_context.tenant,
@@ -89,10 +92,12 @@ def test_run_ingestion_skips_duplicate_urls(source_plugin_context, mocker):
     assert result["items_fetched"] == 1
     assert result["items_ingested"] == 0
     upsert_embedding_mock.assert_not_called()
+    process_content_delay_mock.assert_not_called()
     assert Content.objects.filter(url="https://example.com/post-1").count() == 1
 
 def test_run_ingestion_creates_content_from_reddit_posts(source_plugin_context, mocker):
     upsert_embedding_mock = mocker.patch("core.tasks.upsert_content_embedding")
+    process_content_delay_mock = mocker.patch("core.tasks.process_content.delay")
     reddit_mock = mocker.patch("core.plugins.reddit.praw.Reddit")
     source_config = SourceConfig.objects.create(
             tenant=source_plugin_context.tenant,
@@ -117,6 +122,7 @@ def test_run_ingestion_creates_content_from_reddit_posts(source_plugin_context, 
     assert result["items_ingested"] == 1
     content = Content.objects.get(title="Reddit Post")
     upsert_embedding_mock.assert_called_once_with(content)
+    process_content_delay_mock.assert_called_once_with(content.id)
     assert content.source_plugin == SourcePluginName.REDDIT
     assert content.entity is None
 

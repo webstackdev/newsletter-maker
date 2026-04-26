@@ -153,7 +153,7 @@ UNFOLD = {
             "href": lambda request: static("core/favicon.ico"),
         },
     ],
-    "SITE_ICON": lambda request: static("core/logo.svg"),
+    "SITE_ICON": lambda request: static("core/logo.png"),
     "SITE_SYMBOL": "newsletter",
 }
 
