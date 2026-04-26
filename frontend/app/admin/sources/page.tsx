@@ -16,6 +16,21 @@ type SourcesPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
+const panelClass =
+  "rounded-3xl border border-[#1f2b27]/12 bg-[rgba(255,250,244,0.86)] p-5 shadow-[0_24px_60px_rgba(35,30,22,0.12)] backdrop-blur-xl"
+const eyebrowClass = "m-0 text-[0.78rem] uppercase tracking-[0.12em] opacity-70"
+const emptyStateClass =
+  "rounded-[18px] bg-[#1f2b27]/6 px-4 py-4 text-sm leading-6 text-[#5d6d67]"
+const errorBannerClass =
+  "rounded-[18px] bg-[#c55f4d]/14 px-4 py-4 text-sm leading-6 text-[#7c3023]"
+const metaRowClass = "flex flex-wrap gap-2 text-sm text-[#5d6d67]"
+const inputClass =
+  "w-full rounded-2xl border border-[#1f2b27]/12 bg-white/70 px-4 py-3 text-[#1f2b27] outline-none transition focus:border-[#156f68]/40 focus:ring-2 focus:ring-[#156f68]/15"
+const labelClass = "grid gap-2"
+const labelTextClass = "text-sm font-medium text-[#1f2b27]"
+const primaryButtonClass =
+  "inline-flex min-h-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#156f68,#1d8d83)] px-4 py-3 text-sm font-medium text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+
 export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const resolvedSearchParams = await searchParams
   const tenants = await getTenants()
@@ -29,7 +44,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
         tenants={[]}
         selectedTenantId={null}
       >
-        <div className="empty-state">
+        <div className={emptyStateClass}>
           Create a tenant first in Django admin.
         </div>
       </AppShell>
@@ -57,31 +72,42 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       tenants={tenants}
       selectedTenantId={selectedTenant.id}
     >
-      {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
+      {errorMessage ? (
+        <div className={errorBannerClass}>{errorMessage}</div>
+      ) : null}
       {successMessage ? (
-        <div className="empty-state">{successMessage}</div>
+        <div className={emptyStateClass}>{successMessage}</div>
       ) : null}
 
-      <section className="content-grid">
-        <article className="form-card stack">
-          <p className="eyebrow">Add source</p>
-          <form className="stack" action="/api/source-configs" method="POST">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.95fr)]">
+        <article className={`${panelClass} space-y-4`}>
+          <p className={eyebrowClass}>Add source</p>
+          <form
+            className="space-y-4"
+            action="/api/source-configs"
+            method="POST"
+          >
             <input type="hidden" name="tenantId" value={selectedTenant.id} />
             <input
               type="hidden"
               name="redirectTo"
               value={`/admin/sources?tenant=${selectedTenant.id}`}
             />
-            <label className="field">
-              <span>Plugin</span>
-              <select name="plugin_name" defaultValue="rss">
+            <label className={labelClass}>
+              <span className={labelTextClass}>Plugin</span>
+              <select
+                className={inputClass}
+                name="plugin_name"
+                defaultValue="rss"
+              >
                 <option value="rss">RSS</option>
                 <option value="reddit">Reddit</option>
               </select>
             </label>
-            <label className="field">
-              <span>Config JSON</span>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Config JSON</span>
               <textarea
+                className={`${inputClass} min-h-[120px] resize-y font-mono text-sm`}
                 name="config_json"
                 defaultValue={JSON.stringify(
                   { feed_url: "https://example.com/feed.xml" },
@@ -90,22 +116,26 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                 )}
               />
             </label>
-            <label className="field">
-              <span>Active</span>
-              <select name="is_active" defaultValue="true">
+            <label className={labelClass}>
+              <span className={labelTextClass}>Active</span>
+              <select
+                className={inputClass}
+                name="is_active"
+                defaultValue="true"
+              >
                 <option value="true">Active</option>
                 <option value="false">Disabled</option>
               </select>
             </label>
-            <button className="button" type="submit">
+            <button className={primaryButtonClass} type="submit">
               Create source
             </button>
           </form>
         </article>
 
-        <div className="stack">
+        <div className="space-y-4">
           {sourceConfigs.length === 0 ? (
-            <div className="empty-state">
+            <div className={emptyStateClass}>
               No source configurations exist for this tenant yet.
             </div>
           ) : null}
@@ -113,11 +143,16 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
             const latestRun =
               latestRunByPlugin.get(sourceConfig.plugin_name) ?? null
             return (
-              <article key={sourceConfig.id} className="content-card stack">
-                <div className="content-card__header">
+              <article
+                key={sourceConfig.id}
+                className={`${panelClass} space-y-4`}
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h3>{sourceConfig.plugin_name}</h3>
-                    <div className="meta-row">
+                    <h3 className="font-[family:var(--font-display)] text-[1.45rem] font-bold">
+                      {sourceConfig.plugin_name}
+                    </h3>
+                    <div className={metaRowClass}>
                       <span>Config #{sourceConfig.id}</span>
                       <span>
                         Last fetch {formatDate(sourceConfig.last_fetched_at)}
@@ -132,7 +167,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                 </div>
 
                 <form
-                  className="stack"
+                  className="space-y-4"
                   action={`/api/source-configs/${sourceConfig.id}`}
                   method="POST"
                 >
@@ -146,17 +181,19 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                     name="redirectTo"
                     value={`/admin/sources?tenant=${selectedTenant.id}`}
                   />
-                  <label className="field">
-                    <span>Plugin</span>
+                  <label className={labelClass}>
+                    <span className={labelTextClass}>Plugin</span>
                     <input
+                      className={inputClass}
                       name="plugin_name"
                       defaultValue={sourceConfig.plugin_name}
                       readOnly
                     />
                   </label>
-                  <label className="field">
-                    <span>Config JSON</span>
+                  <label className={labelClass}>
+                    <span className={labelTextClass}>Config JSON</span>
                     <textarea
+                      className={`${inputClass} min-h-[120px] resize-y font-mono text-sm`}
                       name="config_json"
                       defaultValue={JSON.stringify(
                         sourceConfig.config,
@@ -165,9 +202,10 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                       )}
                     />
                   </label>
-                  <label className="field">
-                    <span>Active</span>
+                  <label className={labelClass}>
+                    <span className={labelTextClass}>Active</span>
                     <select
+                      className={inputClass}
                       name="is_active"
                       defaultValue={sourceConfig.is_active ? "true" : "false"}
                     >
@@ -175,13 +213,13 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                       <option value="false">Disabled</option>
                     </select>
                   </label>
-                  <div className="meta-row">
+                  <div className={metaRowClass}>
                     <span>
                       Latest run: {latestRun ? latestRun.status : "none"}
                     </span>
                     <span>{latestRun?.error_message || "No recent error"}</span>
                   </div>
-                  <button className="button" type="submit">
+                  <button className={primaryButtonClass} type="submit">
                     Save source
                   </button>
                 </form>

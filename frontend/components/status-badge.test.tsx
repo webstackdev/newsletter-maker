@@ -9,6 +9,6 @@ describe("StatusBadge", () => {
 
     const badge = screen.getByText("Needs review")
     expect(badge).toBeInTheDocument()
-    expect(badge).toHaveClass("status-badge", "status-badge--warning")
+    expect(badge).toHaveAttribute("data-tone", "warning")
   })
 })

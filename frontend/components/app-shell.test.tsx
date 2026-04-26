@@ -36,8 +36,12 @@ describe("AppShell", () => {
       </AppShell>,
     )
 
-    expect(screen.getByRole("heading", { name: "Editor cockpit" })).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { name: "Editor cockpit" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { name: "Dashboard" }),
+    ).toBeInTheDocument()
     expect(screen.getByText("A test description")).toBeInTheDocument()
     expect(screen.getByText("Child content")).toBeInTheDocument()
   })
@@ -54,16 +58,20 @@ describe("AppShell", () => {
       </AppShell>,
     )
 
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/?tenant=2")
-    expect(screen.getByRole("link", { name: "Entities" })).toHaveAttribute("href", "/entities?tenant=2")
-    expect(screen.getByRole("link", { name: "Ingestion health" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
       "href",
-      "/admin/health?tenant=2",
+      "/?tenant=2",
     )
-    expect(screen.getByRole("link", { name: "Source configs" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Entities" })).toHaveAttribute(
       "href",
-      "/admin/sources?tenant=2",
+      "/entities?tenant=2",
     )
+    expect(
+      screen.getByRole("link", { name: "Ingestion health" }),
+    ).toHaveAttribute("href", "/admin/health?tenant=2")
+    expect(
+      screen.getByRole("link", { name: "Source configs" }),
+    ).toHaveAttribute("href", "/admin/sources?tenant=2")
   })
 
   it("marks the active tenant in the switcher", () => {
@@ -81,8 +89,7 @@ describe("AppShell", () => {
     const activeTenant = screen.getByRole("link", { name: /Platform Weekly/i })
     const inactiveTenant = screen.getByRole("link", { name: /AI Weekly/i })
 
-    expect(activeTenant).toHaveClass("tenant-link--active")
-    expect(inactiveTenant).toHaveClass("tenant-link")
-    expect(inactiveTenant).not.toHaveClass("tenant-link--active")
+    expect(activeTenant).toHaveAttribute("data-active", "true")
+    expect(inactiveTenant).toHaveAttribute("data-active", "false")
   })
 })

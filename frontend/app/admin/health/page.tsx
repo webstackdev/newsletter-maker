@@ -12,6 +12,12 @@ type HealthPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
+const panelClass =
+  "rounded-3xl border border-[#1f2b27]/12 bg-[rgba(255,250,244,0.86)] p-5 shadow-[0_24px_60px_rgba(35,30,22,0.12)] backdrop-blur-xl"
+const emptyStateClass =
+  "rounded-[18px] bg-[#1f2b27]/6 px-4 py-4 text-sm leading-6 text-[#5d6d67]"
+const metaRowClass = "mt-2 flex flex-wrap gap-2 text-sm text-[#5d6d67]"
+
 function deriveSourceStatus(
   isActive: boolean,
   latestRunStatus: string | null,
@@ -45,7 +51,7 @@ export default async function HealthPage({ searchParams }: HealthPageProps) {
         tenants={[]}
         selectedTenantId={null}
       >
-        <div className="empty-state">
+        <div className={emptyStateClass}>
           Create a tenant first in Django admin.
         </div>
       </AppShell>
@@ -71,69 +77,80 @@ export default async function HealthPage({ searchParams }: HealthPageProps) {
       tenants={tenants}
       selectedTenantId={selectedTenant.id}
     >
-      <section className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Status</th>
-              <th>Last fetch</th>
-              <th>Latest run</th>
-              <th>Items</th>
-              <th>Errors</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sourceConfigs.length === 0 ? (
-              <tr>
-                <td colSpan={6}>
-                  <div className="empty-state">
-                    No source configurations exist for this tenant yet.
-                  </div>
-                </td>
+      <section className={`${panelClass} overflow-hidden`}>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b border-[#1f2b27]/12 text-sm text-[#5d6d67]">
+                <th className="px-3 py-4 font-medium">Source</th>
+                <th className="px-3 py-4 font-medium">Status</th>
+                <th className="px-3 py-4 font-medium">Last fetch</th>
+                <th className="px-3 py-4 font-medium">Latest run</th>
+                <th className="px-3 py-4 font-medium">Items</th>
+                <th className="px-3 py-4 font-medium">Errors</th>
               </tr>
-            ) : null}
-            {sourceConfigs.map((sourceConfig) => {
-              const latestRun =
-                latestRunByPlugin.get(sourceConfig.plugin_name) ?? null
-              const status = deriveSourceStatus(
-                sourceConfig.is_active,
-                latestRun?.status ?? null,
-                sourceConfig.last_fetched_at,
-              )
-              return (
-                <tr key={sourceConfig.id}>
-                  <td>
-                    <strong>{sourceConfig.plugin_name}</strong>
-                    <div className="meta-row">
-                      <span>Config #{sourceConfig.id}</span>
-                      <span>
-                        {sourceConfig.is_active ? "active" : "disabled"}
-                      </span>
+            </thead>
+            <tbody>
+              {sourceConfigs.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-4" colSpan={6}>
+                    <div className={emptyStateClass}>
+                      No source configurations exist for this tenant yet.
                     </div>
                   </td>
-                  <td>
-                    <StatusBadge tone={healthTone(status)}>
-                      {status}
-                    </StatusBadge>
-                  </td>
-                  <td>{formatDate(sourceConfig.last_fetched_at)}</td>
-                  <td>
-                    {latestRun
-                      ? `${latestRun.status} at ${formatDate(latestRun.started_at)}`
-                      : "No runs yet"}
-                  </td>
-                  <td>
-                    {latestRun
-                      ? `${latestRun.items_ingested}/${latestRun.items_fetched}`
-                      : "0/0"}
-                  </td>
-                  <td>{latestRun?.error_message || "-"}</td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              ) : null}
+              {sourceConfigs.map((sourceConfig) => {
+                const latestRun =
+                  latestRunByPlugin.get(sourceConfig.plugin_name) ?? null
+                const status = deriveSourceStatus(
+                  sourceConfig.is_active,
+                  latestRun?.status ?? null,
+                  sourceConfig.last_fetched_at,
+                )
+                return (
+                  <tr
+                    key={sourceConfig.id}
+                    className="border-b border-[#1f2b27]/12 align-top last:border-b-0"
+                  >
+                    <td className="px-3 py-4">
+                      <strong className="font-medium text-[#1f2b27]">
+                        {sourceConfig.plugin_name}
+                      </strong>
+                      <div className={metaRowClass}>
+                        <span>Config #{sourceConfig.id}</span>
+                        <span>
+                          {sourceConfig.is_active ? "active" : "disabled"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-4">
+                      <StatusBadge tone={healthTone(status)}>
+                        {status}
+                      </StatusBadge>
+                    </td>
+                    <td className="px-3 py-4 text-sm text-[#1f2b27]">
+                      {formatDate(sourceConfig.last_fetched_at)}
+                    </td>
+                    <td className="px-3 py-4 text-sm text-[#1f2b27]">
+                      {latestRun
+                        ? `${latestRun.status} at ${formatDate(latestRun.started_at)}`
+                        : "No runs yet"}
+                    </td>
+                    <td className="px-3 py-4 text-sm text-[#1f2b27]">
+                      {latestRun
+                        ? `${latestRun.items_ingested}/${latestRun.items_fetched}`
+                        : "0/0"}
+                    </td>
+                    <td className="px-3 py-4 text-sm text-[#1f2b27]">
+                      {latestRun?.error_message || "-"}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
     </AppShell>
   )

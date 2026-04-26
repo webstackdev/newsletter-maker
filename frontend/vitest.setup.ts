@@ -1,7 +1,11 @@
 import "@testing-library/jest-dom"
 
 import { cleanup } from "@testing-library/react"
-import { type ComponentPropsWithoutRef, createElement, type ReactNode } from "react"
+import {
+  type ComponentPropsWithoutRef,
+  createElement,
+  type ReactNode,
+} from "react"
 import { afterEach, vi } from "vitest"
 
 // 1. Mock the Next.js Router
@@ -31,13 +35,12 @@ vi.mock("next/link", () => ({
   default: ({
     children,
     href,
-    className,
+    ...props
   }: {
     children: ReactNode
     href: string
-    className?: string
-  }) => {
-    return createElement("a", { href, className }, children)
+  } & ComponentPropsWithoutRef<"a">) => {
+    return createElement("a", { href, ...props }, children)
   },
 }))
 

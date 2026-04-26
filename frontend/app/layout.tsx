@@ -24,7 +24,11 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${body.variable}`}>{children}</body>
+      <body
+        className={`${display.variable} ${body.variable} min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(21,111,104,0.14),transparent_38%),radial-gradient(circle_at_top_right,rgba(194,122,44,0.14),transparent_28%),linear-gradient(180deg,#f6f1e9_0%,#efe6da_100%)] font-[family:var(--font-body),sans-serif] text-[#1f2b27] antialiased`}
+      >
+        {children}
+      </body>
     </html>
   )
 }
