@@ -21,7 +21,7 @@ services:
     environment:
       BOOTSTRAP_APP: "true"
       <<: *shared-env
-    command: ["gunicorn", "newsletter_maker.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+    command: ["gunicorn", "newsletter_maker.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--reload"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,7 +40,7 @@ services:
     environment:
       BOOTSTRAP_APP: "false"
       <<: *shared-env
-    command: ["celery", "-A", "newsletter_maker", "worker", "--loglevel=info"]
+    command: ["watchmedo", "auto-restart", "--directory=.", "--pattern=*.py", "--recursive", "--", "celery", "-A", "newsletter_maker", "worker", "--loglevel=info"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,7 +52,7 @@ services:
     environment:
       BOOTSTRAP_APP: "false"
       <<: *shared-env
-    command: ["celery", "-A", "newsletter_maker", "beat", "--loglevel=info"]
+    command: ["watchmedo", "auto-restart", "--directory=.", "--pattern=*.py", "--recursive", "--", "celery", "-A", "newsletter_maker", "beat", "--loglevel=info"]
     depends_on:
       postgres:
         condition: service_healthy
