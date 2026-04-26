@@ -9,5 +9,7 @@ venv/
 celerybeat-schedule*
 db.sqlite3
 staticfiles/
+frontend/.next/
+frontend/node_modules/
 
 docs/

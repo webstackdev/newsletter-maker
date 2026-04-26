@@ -14,6 +14,30 @@ build-django:
     if [ ! -f .env ]; then cp .env.example .env; fi
     {{compose}} build django
 
+frontend-install:
+    cd frontend && npm install
+
+frontend-dev:
+    cd frontend && npm run dev
+
+frontend-build:
+    cd frontend && npm run build
+
+frontend-typecheck:
+    cd frontend && npm run typecheck
+
+frontend-lint:
+    cd frontend && npm run lint
+
+frontend-lint-fix:
+    cd frontend && npm run lint:fix
+
+frontend-format:
+    cd frontend && npm run format
+
+frontend-format-check:
+    cd frontend && npm run format:check
+
 up:
     if [ ! -f .env ]; then cp .env.example .env; fi
     {{compose}} up
