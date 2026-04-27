@@ -42,6 +42,7 @@ from core.serializers import (
     TenantSerializer,
     UserFeedbackSerializer,
 )
+from core.tasks import queue_content_skill
 
 TENANT_ID_PARAMETER = OpenApiParameter(
     name="tenant_id",
@@ -528,6 +529,7 @@ class ContentViewSet(TenantOwnedQuerysetMixin, viewsets.ModelViewSet):
         request=None,
         responses={
             201: SkillResultSerializer,
+            202: SkillResultSerializer,
             403: AUTHENTICATION_REQUIRED_RESPONSE,
         },
     )
@@ -549,7 +551,13 @@ class ContentViewSet(TenantOwnedQuerysetMixin, viewsets.ModelViewSet):
                 }
             )
 
-        skill_result = execute_ad_hoc_skill(self.get_object(), skill_name)
+        content = self.get_object()
+        if skill_name in {RELEVANCE_SKILL_NAME, SUMMARIZATION_SKILL_NAME}:
+            skill_result = queue_content_skill(content, skill_name)
+            serializer = SkillResultSerializer(skill_result, context=self.get_serializer_context())
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+        skill_result = execute_ad_hoc_skill(content, skill_name)
         serializer = SkillResultSerializer(skill_result, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

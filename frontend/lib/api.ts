@@ -85,6 +85,14 @@ export async function getTenantSkillResults(
   return apiFetch<SkillResult[]>(`/api/v1/tenants/${tenantId}/skill-results/`)
 }
 
+export async function getContentSkillResults(
+  tenantId: number,
+  contentId: number,
+): Promise<SkillResult[]> {
+  const skillResults = await getTenantSkillResults(tenantId)
+  return skillResults.filter((skillResult) => skillResult.content === contentId)
+}
+
 export async function getTenantReviewQueue(
   tenantId: number,
 ): Promise<ReviewQueueItem[]> {

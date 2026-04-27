@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { AppShell } from "@/components/app-shell"
+import { SkillActionBar } from "@/components/skill-action-bar"
 import { StatusBadge } from "@/components/status-badge"
 import {
   getTenantContent,
@@ -82,6 +83,15 @@ export default async function ContentDetailPage({
     (item) => item.feedback_type === "downvote",
   ).length
   const canSummarize = (content.relevance_score ?? 0) >= 0.7
+  const initialPendingSkills = contentSkillResults
+    .filter(
+      (item) =>
+        item.superseded_by === null &&
+        (item.skill_name === "relevance_scoring" ||
+          item.skill_name === "summarization") &&
+        (item.status === "pending" || item.status === "running"),
+    )
+    .map((item) => item.skill_name as "relevance_scoring" | "summarization")
 
   return (
     <AppShell
@@ -172,42 +182,13 @@ export default async function ContentDetailPage({
           <article className={`${panelClass} space-y-4`}>
             <p className={eyebrowClass}>Skill action bar</p>
             <div className="flex flex-wrap items-center gap-3">
-              <form action="/api/skills/summarization" method="POST">
-                <input
-                  type="hidden"
-                  name="tenantId"
-                  value={selectedTenant.id}
-                />
-                <input type="hidden" name="contentId" value={content.id} />
-                <input
-                  type="hidden"
-                  name="redirectTo"
-                  value={`/content/${content.id}?tenant=${selectedTenant.id}`}
-                />
-                <button
-                  className={ghostButtonClass}
-                  type="submit"
-                  disabled={!canSummarize}
-                >
-                  Summarize
-                </button>
-              </form>
-              <form action="/api/skills/relevance_scoring" method="POST">
-                <input
-                  type="hidden"
-                  name="tenantId"
-                  value={selectedTenant.id}
-                />
-                <input type="hidden" name="contentId" value={content.id} />
-                <input
-                  type="hidden"
-                  name="redirectTo"
-                  value={`/content/${content.id}?tenant=${selectedTenant.id}`}
-                />
-                <button className={ghostButtonClass} type="submit">
-                  Explain relevance
-                </button>
-              </form>
+              <SkillActionBar
+                key={`${selectedTenant.id}:${content.id}:${initialPendingSkills.slice().sort().join(",")}`}
+                tenantId={selectedTenant.id}
+                contentId={content.id}
+                canSummarize={canSummarize}
+                initialPendingSkills={initialPendingSkills}
+              />
               <form action="/api/skills/find_related" method="POST">
                 <input
                   type="hidden"

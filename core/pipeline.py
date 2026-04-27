@@ -18,6 +18,7 @@ CLASSIFICATION_SKILL_NAME = "content_classification"
 RELEVANCE_SKILL_NAME = "relevance_scoring"
 SUMMARIZATION_SKILL_NAME = "summarization"
 RELATED_CONTENT_SKILL_NAME = "find_related"
+ASYNC_AD_HOC_SKILL_NAMES = frozenset({RELEVANCE_SKILL_NAME, SUMMARIZATION_SKILL_NAME})
 
 CONTENT_TYPES = (
     "technical_article",
@@ -287,6 +288,61 @@ def execute_ad_hoc_skill(content: Content, skill_name: str) -> SkillResult:
     raise ValueError(f"Unsupported skill name: {skill_name}")
 
 
+def create_pending_skill_result(content: Content, skill_name: str) -> SkillResult:
+    if skill_name not in ASYNC_AD_HOC_SKILL_NAMES:
+        raise ValueError(f"Unsupported async skill name: {skill_name}")
+    return _create_skill_result(
+        content,
+        skill_name=skill_name,
+        status=SkillStatus.PENDING,
+    )
+
+
+def execute_background_skill_result(skill_result_id: int, skill_name: str) -> SkillResult:
+    skill_result = SkillResult.objects.select_related("content", "content__tenant").get(pk=skill_result_id)
+    if skill_result.skill_name != skill_name:
+        raise ValueError(
+            f"Skill result {skill_result.id} is for {skill_result.skill_name}, not {skill_name}."
+        )
+
+    _update_skill_result(skill_result, status=SkillStatus.RUNNING, error_message="")
+
+    try:
+        if skill_name == RELEVANCE_SKILL_NAME:
+            relevance, relevance_score = _run_ad_hoc_relevance(skill_result.content)
+            return _update_skill_result(
+                skill_result,
+                status=SkillStatus.COMPLETED,
+                result_data=relevance,
+                model_used=relevance["model_used"],
+                latency_ms=relevance["latency_ms"],
+                confidence=relevance_score,
+                error_message="",
+            )
+        if skill_name == SUMMARIZATION_SKILL_NAME:
+            summary = _run_ad_hoc_summarization(skill_result.content)
+            return _update_skill_result(
+                skill_result,
+                status=SkillStatus.COMPLETED,
+                result_data=summary,
+                model_used=summary["model_used"],
+                latency_ms=summary["latency_ms"],
+                error_message="",
+            )
+    except Exception as exc:
+        return _update_skill_result(
+            skill_result,
+            status=SkillStatus.FAILED,
+            result_data=None,
+            model_used="",
+            latency_ms=None,
+            confidence=None,
+            error_message=str(exc),
+        )
+
+    raise ValueError(f"Unsupported async skill name: {skill_name}")
+
+
 def _execute_ad_hoc_classification(content: Content) -> SkillResult:
     try:
         classification = _execute_with_retries(CLASSIFICATION_SKILL_NAME, lambda: run_content_classification(content))
@@ -313,17 +369,7 @@ def _execute_ad_hoc_classification(content: Content) -> SkillResult:
 
 def _execute_ad_hoc_relevance(content: Content) -> SkillResult:
     try:
-        relevance = _execute_with_retries(RELEVANCE_SKILL_NAME, lambda: run_relevance_scoring(content))
-        relevance_score = float(relevance["relevance_score"])
-        content.relevance_score = relevance_score
-        content.is_active = relevance_score >= settings.AI_RELEVANCE_REVIEW_THRESHOLD
-        content.save(update_fields=["relevance_score", "is_active"])
-        if settings.AI_RELEVANCE_REVIEW_THRESHOLD <= relevance_score < settings.AI_RELEVANCE_SUMMARIZE_THRESHOLD:
-            _upsert_review_queue_item(
-                content,
-                reason=ReviewReason.BORDERLINE_RELEVANCE,
-                confidence=relevance_score,
-            )
+        relevance, relevance_score = _run_ad_hoc_relevance(content)
         return _create_skill_result(
             content,
             skill_name=RELEVANCE_SKILL_NAME,
@@ -339,12 +385,7 @@ def _execute_ad_hoc_relevance(content: Content) -> SkillResult:
 
 def _execute_ad_hoc_summarization(content: Content) -> SkillResult:
     try:
-        if (content.relevance_score or 0.0) < settings.AI_RELEVANCE_SUMMARIZE_THRESHOLD:
-            raise ValueError(
-                "Summarization requires relevance_score >= "
-                f"{settings.AI_RELEVANCE_SUMMARIZE_THRESHOLD:.2f}. Run relevance scoring first or review the content."
-            )
-        summary = _execute_with_retries(SUMMARIZATION_SKILL_NAME, lambda: run_summarization(content))
+        summary = _run_ad_hoc_summarization(content)
         return _create_skill_result(
             content,
             skill_name=SUMMARIZATION_SKILL_NAME,
@@ -376,6 +417,30 @@ def _execute_ad_hoc_related_content(content: Content) -> SkillResult:
         )
     except Exception as exc:
         return _create_failed_skill_result(content, skill_name=RELATED_CONTENT_SKILL_NAME, error_message=str(exc))
+
+
+def _run_ad_hoc_relevance(content: Content) -> tuple[dict[str, Any], float]:
+    relevance = _execute_with_retries(RELEVANCE_SKILL_NAME, lambda: run_relevance_scoring(content))
+    relevance_score = float(relevance["relevance_score"])
+    content.relevance_score = relevance_score
+    content.is_active = relevance_score >= settings.AI_RELEVANCE_REVIEW_THRESHOLD
+    content.save(update_fields=["relevance_score", "is_active"])
+    if settings.AI_RELEVANCE_REVIEW_THRESHOLD <= relevance_score < settings.AI_RELEVANCE_SUMMARIZE_THRESHOLD:
+        _upsert_review_queue_item(
+            content,
+            reason=ReviewReason.BORDERLINE_RELEVANCE,
+            confidence=relevance_score,
+        )
+    return relevance, relevance_score
+
+
+def _run_ad_hoc_summarization(content: Content) -> dict[str, Any]:
+    if (content.relevance_score or 0.0) < settings.AI_RELEVANCE_SUMMARIZE_THRESHOLD:
+        raise ValueError(
+            "Summarization requires relevance_score >= "
+            f"{settings.AI_RELEVANCE_SUMMARIZE_THRESHOLD:.2f}. Run relevance scoring first or review the content."
+        )
+    return _execute_with_retries(SUMMARIZATION_SKILL_NAME, lambda: run_summarization(content))
 
 
 def _execute_with_retries(skill_name: str, fn):
@@ -512,3 +577,32 @@ def _create_failed_skill_result(content: Content, *, skill_name: str, error_mess
         result_data=None,
         error_message=error_message,
     )
+
+
+def _update_skill_result(
+    skill_result: SkillResult,
+    *,
+    status: SkillStatus,
+    result_data: dict[str, Any] | None = None,
+    error_message: str = "",
+    model_used: str = "",
+    latency_ms: int | None = None,
+    confidence: float | None = None,
+) -> SkillResult:
+    skill_result.status = status
+    skill_result.result_data = result_data
+    skill_result.error_message = error_message
+    skill_result.model_used = model_used
+    skill_result.latency_ms = latency_ms
+    skill_result.confidence = confidence
+    skill_result.save(
+        update_fields=[
+            "status",
+            "result_data",
+            "error_message",
+            "model_used",
+            "latency_ms",
+            "confidence",
+        ]
+    )
+    return skill_result

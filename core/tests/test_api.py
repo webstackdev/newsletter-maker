@@ -188,29 +188,28 @@ class TenantScopedApiTests(APITestCase):
         created_content = Content.objects.get(title="New Content")
         self.assertEqual(created_content.tenant, self.owner_tenant)
 
-    @patch("core.pipeline.run_relevance_scoring")
-    def test_content_skill_action_runs_relevance_scoring(self, run_relevance_scoring_mock):
-        run_relevance_scoring_mock.return_value = {
-            "relevance_score": 0.82,
-            "explanation": "Strong match for the tenant topic.",
-            "used_llm": False,
-            "model_used": "embedding:test",
-            "latency_ms": 0,
-        }
+    @patch("core.tasks.run_relevance_scoring_skill.delay")
+    def test_content_skill_action_queues_relevance_scoring(self, run_relevance_scoring_delay_mock):
 
         response = self.client.post(
             f"/api/v1/tenants/{self.owner_tenant.id}/contents/{self.owner_content.id}/skills/relevance_scoring/",
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        pending_result = SkillResult.objects.get(
+            content=self.owner_content,
+            skill_name="relevance_scoring",
+            superseded_by__isnull=True,
+        )
+        run_relevance_scoring_delay_mock.assert_called_once_with(pending_result.id)
         self.owner_content.refresh_from_db()
-        self.assertEqual(self.owner_content.relevance_score, 0.82)
-        self.assertTrue(self.owner_content.is_active)
+        self.assertIsNone(self.owner_content.relevance_score)
         self.assertEqual(response.json()["skill_name"], "relevance_scoring")
-        self.assertEqual(response.json()["status"], SkillStatus.COMPLETED)
+        self.assertEqual(response.json()["status"], SkillStatus.PENDING)
 
-    def test_content_skill_action_records_failed_summary_when_relevance_is_too_low(self):
+    @patch("core.tasks.run_summarization_skill.delay")
+    def test_content_skill_action_queues_summarization(self, run_summarization_delay_mock):
         self.owner_content.relevance_score = 0.25
         self.owner_content.save(update_fields=["relevance_score"])
 
@@ -219,10 +218,15 @@ class TenantScopedApiTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        pending_result = SkillResult.objects.get(
+            content=self.owner_content,
+            skill_name="summarization",
+            superseded_by__isnull=True,
+        )
+        run_summarization_delay_mock.assert_called_once_with(pending_result.id)
         self.assertEqual(response.json()["skill_name"], "summarization")
-        self.assertEqual(response.json()["status"], SkillStatus.FAILED)
-        self.assertIn("Summarization requires relevance_score", response.json()["error_message"])
+        self.assertEqual(response.json()["status"], SkillStatus.PENDING)
 
     @patch("core.pipeline.search_similar_content")
     def test_content_skill_action_runs_find_related(self, search_similar_content_mock):
