@@ -144,6 +144,7 @@ UNFOLD = {
     "SITE_TITLE": _("Newsletter Maker"),
     "SITE_HEADER": _("Newsletter Maker"),
     "SITE_SUBHEADER": _("Administration"),
+    "SHOW_HISTORY": True,
     "DASHBOARD_CALLBACK": "core.utils.dashboard_callback",
     "SITE_FAVICONS": [
         {
@@ -154,7 +155,19 @@ UNFOLD = {
         },
     ],
     "SITE_ICON": lambda request: static("core/logo.png"),
-    "SITE_SYMBOL": "newsletter",
+    "SITE_SYMBOL": "speed", # Material Icon for the sidebar
+    "COLORS": {
+        "primary": {
+            "50": "250 245 255",
+            "100": "243 232 255",
+            "500": "168 85 247",
+            "900": "88 28 135",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+    },
 }
 
 # Add metadata for Swagger UI

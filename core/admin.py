@@ -1,3 +1,5 @@
+import json
+
 from django.contrib import admin, messages
 from django.db.models import Avg
 from django.utils import timezone
@@ -5,7 +7,6 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from import_export.admin import ExportActionMixin
 from unfold.admin import ModelAdmin
-import json
 
 from core.models import (
   Content,
@@ -252,8 +253,8 @@ class SkillResultAdmin(ModelAdmin):
         """Resets status to PENDING and clears errors for retry by the worker."""
         updated = queryset.update(status="PENDING", error_message="")
         self.message_user(
-            request, 
-            f"Successfully reset {updated} skills to PENDING for retry.", 
+            request,
+            f"Successfully reset {updated} skills to PENDING for retry.",
             messages.SUCCESS
         )
 
@@ -276,7 +277,7 @@ class SkillResultAdmin(ModelAdmin):
         colors = {"COMPLETED": "green", "FAILED": "red", "PENDING": "orange"}
         color = colors.get(obj.status, "gray")
         return format_html(
-            '<span style="color: {}; font-weight: bold;">● {}</span>', 
+            '<span style="color: {}; font-weight: bold;">● {}</span>',
             color, obj.status
         )
 
@@ -353,7 +354,8 @@ class UserFeedbackAdmin(ModelAdmin):
     def get_ai_score(self, obj):
         """Displays the original AI score to compare with user feedback."""
         score = obj.content.relevance_score
-        if score is None: return "-"
+        if score is None:
+            return "-"
         color = "green" if score > 75 else "red" if score < 40 else "orange"
         return format_html('<b style="color: {};">{}%</b>', color, score)
 

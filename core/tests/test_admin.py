@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import ANY
 
 import pytest
 from django.contrib import messages
@@ -42,7 +43,7 @@ def test_test_source_connection_reports_success(source_admin_context, mocker):
     get_plugin_mock.assert_called_once()
     plugin.health_check.assert_called_once_with()
     admin_instance.message_user.assert_called_once_with(
-        pytest.ANY,
+        ANY,
         "Connectivity check passed for 1 source(s).",
         messages.SUCCESS,
     )
@@ -67,7 +68,7 @@ def test_test_source_connection_reports_failures(source_admin_context, mocker):
     )
 
     admin_instance.message_user.assert_called_once_with(
-        pytest.ANY,
+        ANY,
         "Connectivity check failed for: rss source for Admin Tenant: Missing required config field: feed_url",
         messages.ERROR,
     )
