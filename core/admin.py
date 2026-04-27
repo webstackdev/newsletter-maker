@@ -107,12 +107,13 @@ class ContentAdmin(admin.ModelAdmin):
 
     @admin.display(description="Preview")
     def preview_content(self, obj):
-        """Adds a 'Quick Look' icon that shows the description in an Unfold modal."""
-        if not obj.description:
+        """Adds a quick preview based on the stored content text."""
+        preview_text = (obj.content_text or "").strip()
+        if not preview_text:
             return "-"
         return format_html(
             '<span title="{}" style="cursor:pointer;">🔍 View</span>',
-            obj.description[:500]
+            preview_text[:500]
         )
 
     @admin.display(description="AI Trace")
@@ -343,8 +344,8 @@ class UserFeedbackAdmin(ModelAdmin):
     @admin.display(description="Type")
     def display_feedback(self, obj):
         if obj.feedback_type == "UPVOTE":
-            return format_html('<span style="font-size: 1.2rem;">👍</span>')
-        return format_html('<span style="font-size: 1.2rem;">👎</span>')
+            return format_html('<span style="font-size: {}">{}</span>', "1.2rem", "👍")
+        return format_html('<span style="font-size: {}">{}</span>', "1.2rem", "👎")
 
     @admin.display(description="Content Title")
     def get_content_title(self, obj):
@@ -426,9 +427,10 @@ class IngestionRunAdmin(ModelAdmin):
             return "0/0"
         percent = (obj.items_ingested / obj.items_fetched) * 100
         color = "green" if percent > 90 else "orange" if percent > 50 else "red"
+        percent_label = f"({percent:.0f}%)"
         return format_html(
-            '<b>{} / {}</b> <small style="color: {}">({:.0f}%)</small>',
-            obj.items_ingested, obj.items_fetched, color, percent
+            '<b>{} / {}</b> <small style="color: {}">{}</small>',
+            obj.items_ingested, obj.items_fetched, color, percent_label
         )
 
     @admin.display(description="Duration")
@@ -491,15 +493,15 @@ class SourceConfigAdmin(ModelAdmin):
     @admin.display(description="Status")
     def display_health(self, obj):
         if not obj.is_active:
-            return format_html('<span style="color: gray;">● Paused</span>')
+            return format_html('<span style="color: {};">{}</span>', "gray", "● Paused")
 
         if obj.last_fetched_at:
             hours_since = (timezone.now() - obj.last_fetched_at).total_seconds() / 3600
             if hours_since > 24:
-                return format_html('<span style="color: red;">● Stale</span>')
-            return format_html('<span style="color: green;">● Healthy</span>')
+                return format_html('<span style="color: {};">{}</span>', "red", "● Stale")
+            return format_html('<span style="color: {};">{}</span>', "green", "● Healthy")
 
-        return format_html('<span style="color: orange;">● Never Run</span>')
+        return format_html('<span style="color: {};">{}</span>', "orange", "● Never Run")
 
     @admin.display(description="Config Preview")
     def pretty_config(self, obj):
@@ -589,7 +591,8 @@ class ReviewQueueAdmin(ModelAdmin):
     @admin.display(description="Confidence")
     def display_confidence(self, obj):
         color = "red" if obj.confidence < 0.3 else "orange" if obj.confidence < 0.6 else "green"
-        return format_html('<b style="color: {};">{:.0f}%</b>', color, obj.confidence * 100)
+        confidence_label = f"{obj.confidence * 100:.0f}%"
+        return format_html('<b style="color: {}">{}</b>', color, confidence_label)
 
     @admin.action(description="Approve selected items")
     def mark_as_approved(self, request, queryset):
