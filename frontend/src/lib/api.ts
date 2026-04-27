@@ -34,6 +34,10 @@ function buildUrl(path: string) {
   return new URL(path, API_BASE_URL).toString()
 }
 
+function previewResponseBody(text: string) {
+  return text.replace(/\s+/g, " ").trim().slice(0, 240)
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -52,12 +56,31 @@ export async function apiFetch<T>(
     return undefined as T
   }
 
+  const contentType = response.headers.get("content-type") ?? ""
   const text = await response.text()
-  const data = text ? (JSON.parse(text) as T) : (undefined as T)
   if (!response.ok) {
-    throw new Error(`API request failed (${response.status}): ${text}`)
+    throw new Error(
+      `API request failed (${response.status}) from ${buildUrl(path)} with ${contentType || "unknown content type"}: ${previewResponseBody(text)}`,
+    )
   }
-  return data
+
+  if (!text) {
+    return undefined as T
+  }
+
+  if (!contentType.includes("json")) {
+    throw new Error(
+      `API request to ${buildUrl(path)} returned ${contentType || "unknown content type"} instead of JSON: ${previewResponseBody(text)}`,
+    )
+  }
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(
+      `API request to ${buildUrl(path)} returned invalid JSON: ${previewResponseBody(text)}`,
+    )
+  }
 }
 
 export const getProjects = cache(
