@@ -36,9 +36,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-crate@v2
         with:
-          just-version: "1.50.0"
+          repo: casey/just@1.50.0
+          github-token: ${{ github.token }}
 
       - name: Install dependencies
         run: just install
