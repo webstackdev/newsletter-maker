@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from django.core.management import call_command
+from qdrant_client.http.exceptions import ResponseHandlingException
 
 from core import embeddings
 from core.embeddings import (
@@ -11,7 +13,22 @@ from core.embeddings import (
     search_similar_content,
     upsert_content_embedding,
 )
-from core.models import Content, SourcePluginName, Tenant
+from core.models import (
+    Content,
+    Entity,
+    IngestionRun,
+    ReviewQueue,
+    SkillResult,
+    SourceConfig,
+    SourcePluginName,
+    Tenant,
+    UserFeedback,
+)
+from core.pipeline import (
+    CLASSIFICATION_SKILL_NAME,
+    RELEVANCE_SKILL_NAME,
+    SUMMARIZATION_SKILL_NAME,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -173,7 +190,52 @@ def test_seed_demo_creates_reference_corpus_and_embeds_demo_content(mocker, caps
     call_command("seed_demo")
 
     tenant = Tenant.objects.get(name="Platform Engineering Weekly")
-    assert Content.objects.filter(tenant=tenant, is_reference=True).exists()
-    assert Content.objects.filter(tenant=tenant, is_reference=False).exists()
-    assert upsert_mock.call_count == Content.objects.filter(tenant=tenant).count()
-    assert "Reference corpus items" in capsys.readouterr().out
+    assert Entity.objects.filter(tenant=tenant).count() == 15
+    assert SourceConfig.objects.filter(tenant=tenant).count() == 8
+    assert Content.objects.filter(tenant=tenant, is_reference=True).count() == 50
+    assert Content.objects.filter(tenant=tenant, is_reference=False).count() == 200
+    assert SkillResult.objects.filter(tenant=tenant, skill_name=CLASSIFICATION_SKILL_NAME).count() == 200
+    assert SkillResult.objects.filter(tenant=tenant, skill_name=RELEVANCE_SKILL_NAME).count() == 200
+    assert SkillResult.objects.filter(tenant=tenant, skill_name=SUMMARIZATION_SKILL_NAME).count() == 115
+    assert ReviewQueue.objects.filter(tenant=tenant).exists()
+    assert UserFeedback.objects.filter(tenant=tenant).count() == 45
+    assert IngestionRun.objects.filter(tenant=tenant).count() == 6
+    assert upsert_mock.call_count == 250
+    output = capsys.readouterr().out
+    assert "Reference corpus items: 50" in output
+    assert "Demo content items: 200" in output
+
+
+def test_seed_demo_is_stable_on_rerun(mocker):
+    mocker.patch("core.management.commands.seed_demo.upsert_content_embedding")
+
+    call_command("seed_demo")
+    call_command("seed_demo")
+
+    tenant = Tenant.objects.get(name="Platform Engineering Weekly")
+    assert Entity.objects.filter(tenant=tenant).count() == 15
+    assert SourceConfig.objects.filter(tenant=tenant).count() == 8
+    assert Content.objects.filter(tenant=tenant, is_reference=True).count() == 50
+    assert Content.objects.filter(tenant=tenant, is_reference=False).count() == 200
+    assert SkillResult.objects.filter(tenant=tenant).count() == 515
+    assert ReviewQueue.objects.filter(tenant=tenant).count() > 0
+    assert UserFeedback.objects.filter(tenant=tenant).count() == 45
+    assert IngestionRun.objects.filter(tenant=tenant).count() == 6
+
+
+def test_seed_demo_skips_embeddings_when_vector_stack_is_unavailable(mocker, capsys):
+    upsert_mock = mocker.patch(
+        "core.management.commands.seed_demo.upsert_content_embedding",
+        side_effect=ResponseHandlingException(httpx.ConnectError("connection refused")),
+    )
+
+    call_command("seed_demo")
+
+    tenant = Tenant.objects.get(name="Platform Engineering Weekly")
+    assert Content.objects.filter(tenant=tenant, is_reference=True).count() == 50
+    assert Content.objects.filter(tenant=tenant, is_reference=False).count() == 200
+    assert SkillResult.objects.filter(tenant=tenant).count() == 515
+    assert upsert_mock.call_count == 1
+    combined_output = capsys.readouterr()
+    assert "Skipping remaining embedding sync" in combined_output.err
+    assert "Upserted embeddings for 0 seeded content item(s)." in combined_output.out
