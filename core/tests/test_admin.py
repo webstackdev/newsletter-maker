@@ -4,9 +4,10 @@ from unittest.mock import ANY
 import pytest
 from django.contrib import messages
 from django.contrib.admin.sites import AdminSite
+from django.utils import timezone
 
-from core.admin import SourceConfigAdmin
-from core.models import SourceConfig, SourcePluginName, Tenant
+from core.admin import ReviewQueueAdmin, SourceConfigAdmin
+from core.models import Content, ReviewQueue, ReviewReason, SourceConfig, SourcePluginName, Tenant
 
 pytestmark = pytest.mark.django_db
 
@@ -72,3 +73,34 @@ def test_test_source_connection_reports_failures(source_admin_context, mocker):
         "Connectivity check failed for: rss source for Admin Tenant: Missing required config field: feed_url",
         messages.ERROR,
     )
+
+
+def test_review_queue_changelist_view_builds_dashboard_stats(source_admin_context, mocker):
+    content = Content.objects.create(
+        tenant=source_admin_context.tenant,
+        url="https://example.com/review-item",
+        title="Review Item",
+        author="Reviewer",
+        source_plugin=SourcePluginName.RSS,
+        published_date=timezone.now(),
+        content_text="Review queue content",
+    )
+    ReviewQueue.objects.create(
+        tenant=source_admin_context.tenant,
+        content=content,
+        reason=ReviewReason.BORDERLINE_RELEVANCE,
+        confidence=0.42,
+        resolved=False,
+    )
+    admin_instance = ReviewQueueAdmin(ReviewQueue, AdminSite())
+    mocker.patch.object(admin_instance, "get_queryset", return_value=ReviewQueue.objects.all())
+    super_changelist_view = mocker.patch(
+        "core.admin.ModelAdmin.changelist_view",
+        side_effect=lambda request, extra_context=None: extra_context,
+    )
+
+    response = admin_instance.changelist_view(request=SimpleNamespace())
+
+    super_changelist_view.assert_called_once()
+    assert response["dashboard_stats"][0]["value"] == 1
+    assert response["dashboard_stats"][1]["value"] == "42%"

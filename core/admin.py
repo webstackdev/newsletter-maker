@@ -605,7 +605,7 @@ class ReviewQueueAdmin(ModelAdmin):
         qs = self.get_queryset(request)
         extra_context = extra_context or {}
         pending_count = qs.filter(resolved=False).count()
-        avg_conf = qs.aggregate(admin.db.models.Avg('confidence'))['confidence__avg'] or 0
+        avg_conf = qs.aggregate(avg_confidence=Avg("confidence"))["avg_confidence"] or 0
 
         extra_context["dashboard_stats"] = [
             {
