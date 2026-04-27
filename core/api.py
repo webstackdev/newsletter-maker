@@ -24,13 +24,6 @@ from core.models import (
     SourceConfig,
     UserFeedback,
 )
-from core.pipeline import (
-    CLASSIFICATION_SKILL_NAME,
-    RELATED_CONTENT_SKILL_NAME,
-    RELEVANCE_SKILL_NAME,
-    SUMMARIZATION_SKILL_NAME,
-    execute_ad_hoc_skill,
-)
 from core.serializers import (
     ContentSerializer,
     EntitySerializer,
@@ -42,7 +35,11 @@ from core.serializers import (
     SourceConfigSerializer,
     UserFeedbackSerializer,
 )
-from core.tasks import queue_content_skill
+
+CLASSIFICATION_SKILL_NAME = "content_classification"
+RELEVANCE_SKILL_NAME = "relevance_scoring"
+SUMMARIZATION_SKILL_NAME = "summarization"
+RELATED_CONTENT_SKILL_NAME = "find_related"
 
 PROJECT_ID_PARAMETER = OpenApiParameter(
     name="project_id",
@@ -532,6 +529,9 @@ class ContentViewSet(ProjectOwnedQuerysetMixin, viewsets.ModelViewSet):
     )
     @action(detail=True, methods=["post"], url_path=r"skills/(?P<skill_name>[^/.]+)")
     def run_skill(self, request, *args, **kwargs):
+        from core.pipeline import execute_ad_hoc_skill
+        from core.tasks import queue_content_skill
+
         skill_name = str(kwargs["skill_name"])
         if skill_name not in {
             CLASSIFICATION_SKILL_NAME,

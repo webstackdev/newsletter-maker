@@ -20,7 +20,6 @@ from core.models import (
   UserFeedback,
 )
 from core.plugins import get_plugin_for_source_config, validate_plugin_config
-from core.tasks import process_content
 
 
 @admin.register(Project)
@@ -211,6 +210,8 @@ class ContentAdmin(admin.ModelAdmin):
 
     @admin.action(description="Generate Ideas for Newsletter")
     def generate_newsletter_ideas(self, request, queryset):
+        from core.tasks import process_content
+
         content_ids = list(queryset.values_list("id", flat=True))
         for content_id in content_ids:
             process_content.delay(content_id)

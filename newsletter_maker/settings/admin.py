@@ -1,7 +1,6 @@
 from django.templatetags.static import static
 from django.utils.translation import gettext_lazy as _
 
-
 # Unfold Admin Template
 UNFOLD = {
     "SITE_TITLE": _("Newsletter Maker"),
@@ -18,7 +17,7 @@ UNFOLD = {
         },
     ],
     "SITE_ICON": lambda request: static("core/logo.png"),
-    "SITE_SYMBOL": "speed", # Material Icon for the sidebar
+    "SITE_SYMBOL": "speed",  # Material Icon for the sidebar
     "COLORS": {
         "primary": {
             "50": "250 245 255",

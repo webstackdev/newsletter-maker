@@ -1,7 +1,9 @@
 import "server-only"
 
+import { getServerSession } from "next-auth"
 import { cache } from "react"
 
+import { authOptions } from "@/lib/auth"
 import type {
   Content,
   ContentSkillName,
@@ -16,6 +18,13 @@ import type {
 
 const API_BASE_URL =
   process.env.NEWSLETTER_API_BASE_URL ?? "http://127.0.0.1:8080"
+
+type SessionWithBackendAuth = {
+  backendAuth?: {
+    access?: string
+    key?: string
+  }
+}
 
 function getBasicAuthHeader() {
   const username = process.env.NEWSLETTER_API_USERNAME
@@ -34,6 +43,20 @@ function buildUrl(path: string) {
   return new URL(path, API_BASE_URL).toString()
 }
 
+async function getAuthorizationHeader() {
+  const session = (await getServerSession(authOptions)) as SessionWithBackendAuth | null
+
+  if (session?.backendAuth?.key) {
+    return `Token ${session.backendAuth.key}`
+  }
+
+  if (session?.backendAuth?.access) {
+    return `Bearer ${session.backendAuth.access}`
+  }
+
+  return getBasicAuthHeader()
+}
+
 function previewResponseBody(text: string) {
   return text.replace(/\s+/g, " ").trim().slice(0, 240)
 }
@@ -42,10 +65,12 @@ export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const authorization = await getAuthorizationHeader()
+
   const response = await fetch(buildUrl(path), {
     ...init,
     headers: {
-      Authorization: getBasicAuthHeader(),
+      Authorization: authorization,
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },

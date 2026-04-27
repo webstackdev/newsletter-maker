@@ -17,9 +17,21 @@ from qdrant_client.models import (
   PointStruct,
   VectorParams,
 )
-from sentence_transformers import SentenceTransformer
 
 from core.models import Content
+
+SentenceTransformer = None
+
+
+def get_sentence_transformer_class():
+        global SentenceTransformer
+
+        if SentenceTransformer is None:
+                from sentence_transformers import SentenceTransformer as sentence_transformer_class
+
+                SentenceTransformer = sentence_transformer_class
+
+        return SentenceTransformer
 
 
 class EmbeddingProvider(ABC):
@@ -33,7 +45,8 @@ class EmbeddingProvider(ABC):
 
 class SentenceTransformerEmbeddingProvider(EmbeddingProvider):
     def __init__(self):
-        self.model = SentenceTransformer(
+        sentence_transformer_class = get_sentence_transformer_class()
+        self.model = sentence_transformer_class(
             settings.EMBEDDING_MODEL,
             trust_remote_code=settings.EMBEDDING_TRUST_REMOTE_CODE,
         )
