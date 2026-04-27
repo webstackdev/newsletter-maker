@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -578,14 +578,15 @@ class Command(BaseCommand):
     def _seed_source_configs(self, tenant: Tenant) -> int:
         now = timezone.now()
         for spec in SOURCE_CONFIG_SPECS:
+            hours_ago = cast(int | None, spec["hours_ago"])
             last_fetched_at = None
-            if spec["hours_ago"] is not None:
-                last_fetched_at = now - timedelta(hours=spec["hours_ago"])
+            if hours_ago is not None:
+                last_fetched_at = now - timedelta(hours=hours_ago)
             SourceConfig.objects.create(
                 tenant=tenant,
-                plugin_name=spec["plugin_name"],
+                plugin_name=cast(str, spec["plugin_name"]),
                 config=spec["config"],
-                is_active=spec["is_active"],
+                is_active=cast(bool, spec["is_active"]),
                 last_fetched_at=last_fetched_at,
             )
         return len(SOURCE_CONFIG_SPECS)
@@ -829,16 +830,18 @@ class Command(BaseCommand):
         ]
         now = timezone.now()
         for spec in run_specs:
+            started_hours_ago = cast(int, spec["started_hours_ago"])
+            duration_minutes = cast(int, spec["duration_minutes"])
             run = IngestionRun.objects.create(
                 tenant=tenant,
-                plugin_name=spec["plugin_name"],
-                status=spec["status"],
-                items_fetched=spec["items_fetched"],
-                items_ingested=spec["items_ingested"],
-                error_message=spec["error_message"],
+                plugin_name=cast(str, spec["plugin_name"]),
+                status=cast(str, spec["status"]),
+                items_fetched=cast(int, spec["items_fetched"]),
+                items_ingested=cast(int, spec["items_ingested"]),
+                error_message=cast(str, spec["error_message"]),
             )
-            run.started_at = now - timedelta(hours=spec["started_hours_ago"])
-            run.completed_at = run.started_at + timedelta(minutes=spec["duration_minutes"])
+            run.started_at = now - timedelta(hours=started_hours_ago)
+            run.completed_at = run.started_at + timedelta(minutes=duration_minutes)
             run.save(update_fields=["started_at", "completed_at"])
         return len(run_specs)
 

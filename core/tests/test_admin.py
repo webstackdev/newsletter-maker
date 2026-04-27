@@ -6,8 +6,22 @@ from django.contrib import messages
 from django.contrib.admin.sites import AdminSite
 from django.utils import timezone
 
-from core.admin import ContentAdmin, IngestionRunAdmin, ReviewQueueAdmin, SourceConfigAdmin
-from core.models import Content, IngestionRun, ReviewQueue, ReviewReason, RunStatus, SourceConfig, SourcePluginName, Tenant
+from core.admin import (
+    ContentAdmin,
+    IngestionRunAdmin,
+    ReviewQueueAdmin,
+    SourceConfigAdmin,
+)
+from core.models import (
+    Content,
+    IngestionRun,
+    ReviewQueue,
+    ReviewReason,
+    RunStatus,
+    SourceConfig,
+    SourcePluginName,
+    Tenant,
+)
 
 pytestmark = pytest.mark.django_db
 

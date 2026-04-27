@@ -13,4 +13,3 @@ docker inspect newsletter-maker-django-1 --format '{{json .Mounts}}'
 pytest core/tests/test_embeddings.py -q
 ruff check core/management/commands/seed_demo.py core/tests/test_embeddings.py
 ```
-
