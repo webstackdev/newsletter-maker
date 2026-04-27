@@ -6,8 +6,8 @@ from django.contrib import messages
 from django.contrib.admin.sites import AdminSite
 from django.utils import timezone
 
-from core.admin import ContentAdmin, ReviewQueueAdmin, SourceConfigAdmin
-from core.models import Content, ReviewQueue, ReviewReason, SourceConfig, SourcePluginName, Tenant
+from core.admin import ContentAdmin, IngestionRunAdmin, ReviewQueueAdmin, SourceConfigAdmin
+from core.models import Content, IngestionRun, ReviewQueue, ReviewReason, RunStatus, SourceConfig, SourcePluginName, Tenant
 
 pytestmark = pytest.mark.django_db
 
@@ -119,6 +119,45 @@ def test_review_queue_changelist_view_builds_dashboard_stats(source_admin_contex
     super_changelist_view.assert_called_once()
     assert response["dashboard_stats"][0]["value"] == 1
     assert response["dashboard_stats"][1]["value"] == "42%"
+
+
+def test_review_queue_display_confidence_renders_without_django6_format_error(source_admin_context):
+    content = Content.objects.create(
+        tenant=source_admin_context.tenant,
+        url="https://example.com/review-confidence",
+        title="Review Confidence",
+        author="Reviewer",
+        source_plugin=SourcePluginName.RSS,
+        published_date=timezone.now(),
+        content_text="Review queue content",
+    )
+    review_item = ReviewQueue.objects.create(
+        tenant=source_admin_context.tenant,
+        content=content,
+        reason=ReviewReason.BORDERLINE_RELEVANCE,
+        confidence=0.42,
+        resolved=False,
+    )
+    admin_instance = ReviewQueueAdmin(ReviewQueue, AdminSite())
+
+    rendered = admin_instance.display_confidence(review_item)
+
+    assert "42%" in rendered
+
+
+def test_ingestion_run_display_efficiency_renders_without_django6_format_error(source_admin_context):
+    run = IngestionRun.objects.create(
+        tenant=source_admin_context.tenant,
+        plugin_name=SourcePluginName.RSS,
+        status=RunStatus.SUCCESS,
+        items_fetched=12,
+        items_ingested=9,
+    )
+    admin_instance = IngestionRunAdmin(IngestionRun, AdminSite())
+
+    rendered = admin_instance.display_efficiency(run)
+
+    assert "75%" in rendered
 
 
 def test_content_preview_uses_content_text(source_admin_context):

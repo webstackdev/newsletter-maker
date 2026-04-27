@@ -427,9 +427,10 @@ class IngestionRunAdmin(ModelAdmin):
             return "0/0"
         percent = (obj.items_ingested / obj.items_fetched) * 100
         color = "green" if percent > 90 else "orange" if percent > 50 else "red"
+        percent_label = f"({percent:.0f}%)"
         return format_html(
-            '<b>{} / {}</b> <small style="color: {}">({:.0f}%)</small>',
-            obj.items_ingested, obj.items_fetched, color, percent
+            '<b>{} / {}</b> <small style="color: {}">{}</small>',
+            obj.items_ingested, obj.items_fetched, color, percent_label
         )
 
     @admin.display(description="Duration")
@@ -590,7 +591,8 @@ class ReviewQueueAdmin(ModelAdmin):
     @admin.display(description="Confidence")
     def display_confidence(self, obj):
         color = "red" if obj.confidence < 0.3 else "orange" if obj.confidence < 0.6 else "green"
-        return format_html('<b style="color: {};">{:.0f}%</b>', color, obj.confidence * 100)
+        confidence_label = f"{obj.confidence * 100:.0f}%"
+        return format_html('<b style="color: {}">{}</b>', color, confidence_label)
 
     @admin.action(description="Approve selected items")
     def mark_as_approved(self, request, queryset):
