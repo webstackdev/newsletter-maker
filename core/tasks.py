@@ -6,7 +6,13 @@ from django.utils import timezone
 
 from core.embeddings import upsert_content_embedding
 from core.models import Content, IngestionRun, RunStatus, SourceConfig
-from core.pipeline import process_content_pipeline
+from core.pipeline import (
+    RELEVANCE_SKILL_NAME,
+    SUMMARIZATION_SKILL_NAME,
+    create_pending_skill_result,
+    execute_background_skill_result,
+    process_content_pipeline,
+)
 from core.plugins import get_plugin_for_source_config
 
 logger = logging.getLogger(__name__)
@@ -52,6 +58,36 @@ def run_all_ingestions():
 @shared_task(name="core.tasks.process_content")
 def process_content(content_id: int):
     return process_content_pipeline(content_id)
+
+
+@shared_task(name="core.tasks.run_relevance_scoring_skill", ignore_result=True)
+def run_relevance_scoring_skill(skill_result_id: int):
+    return execute_background_skill_result(skill_result_id, RELEVANCE_SKILL_NAME)
+
+
+@shared_task(name="core.tasks.run_summarization_skill", ignore_result=True)
+def run_summarization_skill(skill_result_id: int):
+    return execute_background_skill_result(skill_result_id, SUMMARIZATION_SKILL_NAME)
+
+
+def queue_content_skill(content: Content, skill_name: str):
+    skill_result = create_pending_skill_result(content, skill_name)
+
+    if skill_name == RELEVANCE_SKILL_NAME:
+        if settings.CELERY_TASK_ALWAYS_EAGER:
+            run_relevance_scoring_skill(skill_result.id)
+        else:
+            run_relevance_scoring_skill.delay(skill_result.id)
+    elif skill_name == SUMMARIZATION_SKILL_NAME:
+        if settings.CELERY_TASK_ALWAYS_EAGER:
+            run_summarization_skill(skill_result.id)
+        else:
+            run_summarization_skill.delay(skill_result.id)
+    else:
+        raise ValueError(f"Unsupported async skill name: {skill_name}")
+
+    skill_result.refresh_from_db()
+    return skill_result
 
 
 def _ingest_source_config(source_config: SourceConfig) -> tuple[int, int]:

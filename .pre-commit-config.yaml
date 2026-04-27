@@ -13,3 +13,8 @@ repos:
         entry: just lint
         language: system
         pass_filenames: false
+      - id: just-test
+        name: just test
+        entry: just test
+        language: system
+        pass_filenames: false

@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -184,6 +187,71 @@ class TenantScopedApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         created_content = Content.objects.get(title="New Content")
         self.assertEqual(created_content.tenant, self.owner_tenant)
+
+    @patch("core.tasks.run_relevance_scoring_skill.delay")
+    def test_content_skill_action_queues_relevance_scoring(self, run_relevance_scoring_delay_mock):
+
+        response = self.client.post(
+            f"/api/v1/tenants/{self.owner_tenant.id}/contents/{self.owner_content.id}/skills/relevance_scoring/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        pending_result = SkillResult.objects.get(
+            content=self.owner_content,
+            skill_name="relevance_scoring",
+            superseded_by__isnull=True,
+        )
+        run_relevance_scoring_delay_mock.assert_called_once_with(pending_result.id)
+        self.owner_content.refresh_from_db()
+        self.assertIsNone(self.owner_content.relevance_score)
+        self.assertEqual(response.json()["skill_name"], "relevance_scoring")
+        self.assertEqual(response.json()["status"], SkillStatus.PENDING)
+
+    @patch("core.tasks.run_summarization_skill.delay")
+    def test_content_skill_action_queues_summarization(self, run_summarization_delay_mock):
+        self.owner_content.relevance_score = 0.25
+        self.owner_content.save(update_fields=["relevance_score"])
+
+        response = self.client.post(
+            f"/api/v1/tenants/{self.owner_tenant.id}/contents/{self.owner_content.id}/skills/summarization/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        pending_result = SkillResult.objects.get(
+            content=self.owner_content,
+            skill_name="summarization",
+            superseded_by__isnull=True,
+        )
+        run_summarization_delay_mock.assert_called_once_with(pending_result.id)
+        self.assertEqual(response.json()["skill_name"], "summarization")
+        self.assertEqual(response.json()["status"], SkillStatus.PENDING)
+
+    @patch("core.pipeline.search_similar_content")
+    def test_content_skill_action_runs_find_related(self, search_similar_content_mock):
+        search_similar_content_mock.return_value = [
+            SimpleNamespace(
+                score=0.91,
+                payload={
+                    "content_id": self.other_content.id,
+                    "title": self.other_content.title,
+                    "url": self.other_content.url,
+                    "published_date": self.other_content.published_date,
+                    "source_plugin": self.other_content.source_plugin,
+                },
+            )
+        ]
+
+        response = self.client.post(
+            f"/api/v1/tenants/{self.owner_tenant.id}/contents/{self.owner_content.id}/skills/find_related/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["skill_name"], "find_related")
+        self.assertEqual(response.json()["status"], SkillStatus.COMPLETED)
+        self.assertEqual(response.json()["result_data"]["related_items"][0]["content_id"], self.other_content.id)
 
     def test_authenticated_nested_list_endpoints_smoke(self):
         list_endpoints = [

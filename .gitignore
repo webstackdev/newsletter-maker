@@ -6,8 +6,11 @@ __pycache__/
 .venv/
 venv/
 .env
+frontend/.env.local
 celerybeat-schedule*
 db.sqlite3
 staticfiles/
+frontend/.next/
+frontend/node_modules/
 
 docs/

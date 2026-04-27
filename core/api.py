@@ -8,8 +8,10 @@ from drf_spectacular.utils import (
     extend_schema_view,
     inline_serializer,
 )
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
+from rest_framework.response import Response
 
 from core.models import (
     Content,
@@ -22,6 +24,13 @@ from core.models import (
     TenantConfig,
     UserFeedback,
 )
+from core.pipeline import (
+    CLASSIFICATION_SKILL_NAME,
+    RELATED_CONTENT_SKILL_NAME,
+    RELEVANCE_SKILL_NAME,
+    SUMMARIZATION_SKILL_NAME,
+    execute_ad_hoc_skill,
+)
 from core.serializers import (
     ContentSerializer,
     EntitySerializer,
@@ -33,12 +42,23 @@ from core.serializers import (
     TenantSerializer,
     UserFeedbackSerializer,
 )
+from core.tasks import queue_content_skill
 
 TENANT_ID_PARAMETER = OpenApiParameter(
     name="tenant_id",
     type=int,
     location=OpenApiParameter.PATH,
     description="The unique ID of the tenant that owns this nested resource.",
+)
+
+SKILL_NAME_PARAMETER = OpenApiParameter(
+    name="skill_name",
+    type=str,
+    location=OpenApiParameter.PATH,
+    description=(
+        "The skill to run for this content item. Supported values: "
+        "content_classification, relevance_scoring, summarization, find_related."
+    ),
 )
 
 TENANT_CREATE_REQUEST_EXAMPLE = OpenApiExample(
@@ -497,6 +517,49 @@ class EntityViewSet(TenantOwnedQuerysetMixin, viewsets.ModelViewSet):
 class ContentViewSet(TenantOwnedQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = ContentSerializer
     queryset = Content.objects.select_related("tenant", "entity")
+
+    @extend_schema(
+        summary="Run content skill",
+        description=(
+            "Run one ad hoc skill for the selected content item and persist the outcome as a SkillResult. "
+            "Supported skill names are content_classification, relevance_scoring, summarization, and find_related."
+        ),
+        tags=["AI Processing"],
+        parameters=[TENANT_ID_PARAMETER, SKILL_NAME_PARAMETER],
+        request=None,
+        responses={
+            201: SkillResultSerializer,
+            202: SkillResultSerializer,
+            403: AUTHENTICATION_REQUIRED_RESPONSE,
+        },
+    )
+    @action(detail=True, methods=["post"], url_path=r"skills/(?P<skill_name>[^/.]+)")
+    def run_skill(self, request, *args, **kwargs):
+        skill_name = str(kwargs["skill_name"])
+        if skill_name not in {
+            CLASSIFICATION_SKILL_NAME,
+            RELEVANCE_SKILL_NAME,
+            SUMMARIZATION_SKILL_NAME,
+            RELATED_CONTENT_SKILL_NAME,
+        }:
+            raise serializers.ValidationError(
+                {
+                    "skill_name": (
+                        "Unsupported skill. Choose one of: content_classification, relevance_scoring, "
+                        "summarization, find_related."
+                    )
+                }
+            )
+
+        content = self.get_object()
+        if skill_name in {RELEVANCE_SKILL_NAME, SUMMARIZATION_SKILL_NAME}:
+            skill_result = queue_content_skill(content, skill_name)
+            serializer = SkillResultSerializer(skill_result, context=self.get_serializer_context())
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+        skill_result = execute_ad_hoc_skill(content, skill_name)
+        serializer = SkillResultSerializer(skill_result, context=self.get_serializer_context())
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 @document_tenant_owned_viewset(

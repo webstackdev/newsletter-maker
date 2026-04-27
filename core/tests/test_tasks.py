@@ -3,8 +3,24 @@ from types import SimpleNamespace
 
 import pytest
 
-from core.models import Content, Entity, IngestionRun, RunStatus, SourceConfig, SourcePluginName, Tenant
-from core.tasks import run_all_ingestions, run_ingestion
+from core.models import (
+    Content,
+    Entity,
+    IngestionRun,
+    RunStatus,
+    SkillStatus,
+    SourceConfig,
+    SourcePluginName,
+    Tenant,
+)
+from core.pipeline import RELEVANCE_SKILL_NAME, SUMMARIZATION_SKILL_NAME
+from core.tasks import (
+    queue_content_skill,
+    run_all_ingestions,
+    run_ingestion,
+    run_relevance_scoring_skill,
+    run_summarization_skill,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -167,3 +183,83 @@ def test_run_ingestion_marks_failure_when_plugin_errors(source_plugin_context, m
     ingestion_run = IngestionRun.objects.get(tenant=source_plugin_context.tenant, plugin_name=SourcePluginName.RSS)
     assert ingestion_run.status == RunStatus.FAILED
     assert ingestion_run.error_message == "feed unavailable"
+
+
+def test_queue_content_skill_enqueues_relevance_task(source_plugin_context, mocker):
+    content = Content.objects.create(
+        tenant=source_plugin_context.tenant,
+        entity=source_plugin_context.entity,
+        url="https://example.com/manual-content",
+        title="Manual Content",
+        author="Author",
+        source_plugin=SourcePluginName.RSS,
+        published_date="2026-04-20T12:00:00Z",
+        content_text="Manual content body",
+    )
+    delay_mock = mocker.patch("core.tasks.run_relevance_scoring_skill.delay")
+
+    skill_result = queue_content_skill(content, RELEVANCE_SKILL_NAME)
+
+    assert skill_result.status == SkillStatus.PENDING
+    delay_mock.assert_called_once_with(skill_result.id)
+
+
+def test_run_relevance_scoring_skill_updates_pending_result(source_plugin_context, mocker):
+    content = Content.objects.create(
+        tenant=source_plugin_context.tenant,
+        entity=source_plugin_context.entity,
+        url="https://example.com/relevance-content",
+        title="Relevance Content",
+        author="Author",
+        source_plugin=SourcePluginName.RSS,
+        published_date="2026-04-20T12:00:00Z",
+        content_text="Manual content body",
+    )
+    mocker.patch(
+        "core.pipeline.run_relevance_scoring",
+        return_value={
+            "relevance_score": 0.82,
+            "explanation": "Strong match for the tenant topic.",
+            "used_llm": False,
+            "model_used": "embedding:test",
+            "latency_ms": 0,
+        },
+    )
+    delay_mock = mocker.patch("core.tasks.run_relevance_scoring_skill.delay")
+
+    pending_result = queue_content_skill(content, RELEVANCE_SKILL_NAME)
+    delay_mock.assert_called_once_with(pending_result.id)
+
+    result = run_relevance_scoring_skill(pending_result.id)
+
+    content.refresh_from_db()
+    pending_result.refresh_from_db()
+    assert result.status == SkillStatus.COMPLETED
+    assert pending_result.status == SkillStatus.COMPLETED
+    assert content.relevance_score == pytest.approx(0.82)
+    assert content.is_active is True
+
+
+def test_run_summarization_skill_marks_result_failed_when_relevance_is_too_low(source_plugin_context, mocker):
+    content = Content.objects.create(
+        tenant=source_plugin_context.tenant,
+        entity=source_plugin_context.entity,
+        url="https://example.com/summary-content",
+        title="Summary Content",
+        author="Author",
+        source_plugin=SourcePluginName.RSS,
+        published_date="2026-04-20T12:00:00Z",
+        content_text="Manual content body",
+        relevance_score=0.25,
+    )
+    delay_mock = mocker.patch("core.tasks.run_summarization_skill.delay")
+
+    pending_result = queue_content_skill(content, SUMMARIZATION_SKILL_NAME)
+    delay_mock.assert_called_once_with(pending_result.id)
+
+    result = run_summarization_skill(pending_result.id)
+
+    pending_result.refresh_from_db()
+    assert result.status == SkillStatus.FAILED
+    assert pending_result.status == SkillStatus.FAILED
+    assert "Summarization requires relevance_score" in pending_result.error_message
