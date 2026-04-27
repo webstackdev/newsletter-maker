@@ -135,7 +135,7 @@ migrate:
 
 seed:
     if [ ! -f .env ]; then cp .env.example .env; fi
-    python3 manage.py seed_demo
+    {{compose}} exec django python manage.py seed_demo
 
 embed-all:
     if [ ! -f .env ]; then cp .env.example .env; fi
