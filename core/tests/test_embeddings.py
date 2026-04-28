@@ -1,17 +1,23 @@
 from types import SimpleNamespace
+from io import StringIO
+from unittest.mock import call
 
 import httpx
 import pytest
 from django.contrib.auth.models import Group
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from qdrant_client.http.exceptions import ResponseHandlingException
 
 from core import embeddings
 from core.embeddings import (
+    build_content_embedding_text,
+    build_search_filter,
     get_embedding_provider,
     get_reference_similarity,
+    normalize_text,
     search_similar,
     search_similar_content,
+    serialize_published_date,
     upsert_content_embedding,
 )
 from core.models import (
@@ -169,6 +175,90 @@ def test_openrouter_embedding_provider_calls_embeddings_endpoint(settings, mocke
     assert post_mock.call_args.kwargs["headers"]["Authorization"] == "Bearer test-key"
 
 
+def test_openrouter_embedding_provider_requires_api_key(settings):
+    settings.EMBEDDING_PROVIDER = "openrouter"
+    settings.OPENROUTER_API_KEY = ""
+
+    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY must be set"):
+        embeddings.embed_text("api text")
+
+
+def test_ollama_embedding_provider_falls_back_to_legacy_endpoint_on_404(settings, mocker):
+    settings.EMBEDDING_PROVIDER = "ollama"
+    settings.EMBEDDING_MODEL = "nomic-embed-text"
+    embed_response = SimpleNamespace(status_code=404)
+    legacy_response = SimpleNamespace(
+        json=lambda: {"embedding": [0.9, 0.8]},
+        raise_for_status=lambda: None,
+    )
+    post_mock = mocker.patch("core.embeddings.httpx.post", side_effect=[embed_response, legacy_response])
+
+    vector = embeddings.embed_text("legacy text")
+
+    assert vector == [0.9, 0.8]
+    assert post_mock.call_args_list[1].args[0].endswith("/api/embeddings")
+
+
+def test_get_embedding_provider_rejects_unsupported_backend(settings):
+    settings.EMBEDDING_PROVIDER = "unsupported"
+
+    with pytest.raises(ValueError, match="Unsupported embedding provider"):
+        get_embedding_provider()
+
+
+def test_ensure_project_collection_skips_create_when_collection_exists(embedding_context, mocker):
+    client_mock = mocker.patch("core.embeddings.get_qdrant_client")
+    exists_mock = mocker.patch("core.embeddings.project_collection_exists", return_value=True)
+
+    embeddings.ensure_project_collection(embedding_context.project.id)
+
+    exists_mock.assert_called_once_with(embedding_context.project.id)
+    client_mock.return_value.create_collection.assert_not_called()
+
+
+def test_project_collection_exists_returns_false_when_lookup_raises(embedding_context, mocker):
+    client_mock = mocker.patch("core.embeddings.get_qdrant_client")
+    client_mock.return_value.get_collection.side_effect = RuntimeError("missing")
+
+    assert embeddings.project_collection_exists(embedding_context.project.id) is False
+
+
+def test_build_content_embedding_text_skips_blank_parts(embedding_context):
+    embedding_context.content.title = ""
+
+    assert build_content_embedding_text(embedding_context.content) == "This article covers platform engineering practices."
+
+
+@pytest.mark.parametrize(
+    ("raw_text", "expected"),
+    [
+        ("  trimmed  ", "trimmed"),
+        ("   ", "empty content"),
+    ],
+)
+def test_normalize_text_handles_blank_and_trimmed_input(raw_text, expected):
+    assert normalize_text(raw_text) == expected
+
+
+def test_serialize_published_date_handles_string_and_fallback_values():
+    assert serialize_published_date("2026-04-20T12:00:00Z") == "2026-04-20T12:00:00+00:00"
+    assert serialize_published_date("not-a-date") == "not-a-date"
+    assert serialize_published_date(123) == "123"
+
+
+def test_build_search_filter_returns_none_without_conditions():
+    assert build_search_filter() is None
+
+
+def test_build_search_filter_supports_reference_and_exclusion_conditions():
+    filter_value = build_search_filter(is_reference=True, exclude_content_id=42)
+
+    assert filter_value.must[0].key == "is_reference"
+    assert filter_value.must[0].match.value is True
+    assert filter_value.must_not[0].key == "content_id"
+    assert filter_value.must_not[0].match.value == 42
+
+
 def test_embedding_smoke_command_prints_dimension(mocker, capsys):
     embed_text_mock = mocker.patch("core.management.commands.embedding_smoke.embed_text", return_value=[0.1, 0.2, 0.3])
 
@@ -242,3 +332,74 @@ def test_seed_demo_skips_embeddings_when_vector_stack_is_unavailable(mocker, cap
     combined_output = capsys.readouterr()
     assert "Skipping remaining embedding sync" in combined_output.err
     assert "Upserted embeddings for 0 seeded content item(s)." in combined_output.out
+
+
+def test_sync_embeddings_scopes_to_requested_content_id(embedding_context, mocker):
+    sibling_content = Content.objects.create(
+        project=embedding_context.project,
+        url="https://example.com/embed-sibling",
+        title="Sibling Content",
+        author="Author",
+        source_plugin=SourcePluginName.RSS,
+        published_date="2026-04-21T12:00:00Z",
+        content_text="Sibling body.",
+    )
+    upsert_mock = mocker.patch("core.management.commands.sync_embeddings.upsert_content_embedding")
+    stdout = StringIO()
+
+    call_command("sync_embeddings", content_id=embedding_context.content.id, stdout=stdout)
+
+    upsert_mock.assert_called_once_with(embedding_context.content)
+    assert sibling_content.id != embedding_context.content.id
+    assert "Synced embeddings for 1 content item(s)." in stdout.getvalue()
+
+
+def test_sync_embeddings_filters_project_and_references_only(embedding_context, django_user_model, mocker):
+    other_user = django_user_model.objects.create_user(username="embed-owner-2", password="testpass123")
+    other_group = Group.objects.create(name="embedding-team-2")
+    other_user.groups.add(other_group)
+    other_project = Project.objects.create(name="Other Embedding Project", group=other_group, topic_description="Other")
+    same_project_reference = Content.objects.create(
+        project=embedding_context.project,
+        url="https://example.com/reference-item",
+        title="Reference Item",
+        author="Author",
+        source_plugin=SourcePluginName.RSS,
+        published_date="2026-04-22T12:00:00Z",
+        content_text="Reference body.",
+        is_reference=True,
+    )
+    Content.objects.create(
+        project=embedding_context.project,
+        url="https://example.com/non-reference-item",
+        title="Non Reference Item",
+        author="Author",
+        source_plugin=SourcePluginName.RSS,
+        published_date="2026-04-23T12:00:00Z",
+        content_text="Non reference body.",
+        is_reference=False,
+    )
+    Content.objects.create(
+        project=other_project,
+        url="https://example.com/other-project-reference",
+        title="Other Project Reference",
+        author="Author",
+        source_plugin=SourcePluginName.RSS,
+        published_date="2026-04-24T12:00:00Z",
+        content_text="Other project reference body.",
+        is_reference=True,
+    )
+    upsert_mock = mocker.patch("core.management.commands.sync_embeddings.upsert_content_embedding")
+
+    call_command(
+        "sync_embeddings",
+        project_id=embedding_context.project.id,
+        references_only=True,
+    )
+
+    assert upsert_mock.call_args_list == [call(same_project_reference)]
+
+
+def test_sync_embeddings_raises_command_error_when_scope_matches_no_content():
+    with pytest.raises(CommandError, match="No content records matched the requested scope"):
+        call_command("sync_embeddings", project_id=999999)

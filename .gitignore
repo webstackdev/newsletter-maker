@@ -5,10 +5,12 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+.coverage
 .env
 frontend/.env.local
 celerybeat-schedule*
 db.sqlite3
+htmlcov/
 staticfiles/
 frontend/.next/
 frontend/coverage/

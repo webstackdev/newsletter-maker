@@ -90,6 +90,15 @@ frontend-test:
 backend-test:
     python3 -m pytest
 
+backend-test-coverage:
+    python3 -m coverage erase
+    python3 -m coverage run -m pytest
+    python3 -m coverage report -m
+
+backend-test-coverage-html:
+    just backend-test-coverage
+    python3 -m coverage html
+
 test:
     just backend-test
     just frontend-test

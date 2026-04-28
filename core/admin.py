@@ -253,7 +253,7 @@ class SkillResultAdmin(ModelAdmin):
     @admin.action(description="Retry Selected Skills")
     def retry_selected_skills(self, request, queryset):
         """Resets status to PENDING and clears errors for retry by the worker."""
-        updated = queryset.update(status="PENDING", error_message="")
+        updated = queryset.update(status="pending", error_message="")
         self.message_user(
             request,
             f"Successfully reset {updated} skills to PENDING for retry.",
@@ -276,11 +276,12 @@ class SkillResultAdmin(ModelAdmin):
 
     @admin.display(description="Status")
     def display_status(self, obj):
-        colors = {"COMPLETED": "green", "FAILED": "red", "PENDING": "orange"}
-        color = colors.get(obj.status, "gray")
+        status_value = str(obj.status).lower()
+        colors = {"completed": "green", "failed": "red", "pending": "orange"}
+        color = colors.get(status_value, "gray")
         return format_html(
             '<span style="color: {}; font-weight: bold;">● {}</span>',
-            color, obj.status
+            color, status_value.upper()
         )
 
     @admin.display(description="Perf / Conf")
@@ -309,7 +310,7 @@ class SkillResultAdmin(ModelAdmin):
         extra_context = extra_context or {}
         metrics = qs.aggregate(avg_lat=Avg('latency_ms'))
         avg_latency = metrics['avg_lat'] or 0
-        failure_count = qs.filter(status='FAILED').count()
+        failure_count = qs.filter(status='failed').count()
         total_count = qs.count() or 1
 
         extra_context["dashboard_stats"] = [
@@ -344,7 +345,7 @@ class UserFeedbackAdmin(ModelAdmin):
 
     @admin.display(description="Type")
     def display_feedback(self, obj):
-        if obj.feedback_type == "UPVOTE":
+        if str(obj.feedback_type).lower() == "upvote":
             return format_html('<span style="font-size: {}">{}</span>', "1.2rem", "👍")
         return format_html('<span style="font-size: {}">{}</span>', "1.2rem", "👎")
 
@@ -364,7 +365,7 @@ class UserFeedbackAdmin(ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         qs = self.get_queryset(request)
         extra_context = extra_context or {}
-        upvotes = qs.filter(feedback_type="UPVOTE").count()
+        upvotes = qs.filter(feedback_type="upvote").count()
         total = qs.count() or 1
         approval_rate = (upvotes / total) * 100
 
@@ -415,11 +416,12 @@ class IngestionRunAdmin(ModelAdmin):
 
     @admin.display(description="Status")
     def display_status(self, obj):
-        colors = {"COMPLETED": "success", "FAILED": "danger", "RUNNING": "info"}
+        status_value = str(obj.status).lower()
+        colors = {"success": "success", "failed": "danger", "running": "info"}
         return format_html(
             '<span class="unfold-badge {}">{}</span>',
-            colors.get(obj.status, "warning"),
-            obj.status
+            colors.get(status_value, "warning"),
+            status_value.upper()
         )
 
     @admin.display(description="Efficiency (Ingested/Fetched)")
@@ -446,7 +448,7 @@ class IngestionRunAdmin(ModelAdmin):
         qs = self.get_queryset(request)
         extra_context = extra_context or {}
         total_runs = qs.count()
-        failed_runs = qs.filter(status="FAILED").count()
+        failed_runs = qs.filter(status="failed").count()
         total_ingested = sum(qs.values_list('items_ingested', flat=True))
 
         extra_context["dashboard_stats"] = [

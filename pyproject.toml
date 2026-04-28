@@ -33,3 +33,12 @@ ignore_missing_imports = true
 
 [tool.django-stubs]
 django_settings_module = "newsletter_maker.settings"
+
+[tool.coverage.run]
+branch = true
+source = ["core", "newsletter_maker"]
+omit = ["*/tests/*", "*/migrations/*"]
+
+[tool.coverage.report]
+show_missing = true
+omit = ["*/tests/*", "*/migrations/*"]
