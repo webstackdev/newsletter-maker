@@ -30,6 +30,17 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
   })
 }
 
+function getExpectedBasicAuthHeader() {
+  const username = process.env.NEWSLETTER_API_USERNAME
+  const password = process.env.NEWSLETTER_API_PASSWORD
+
+  if (!username || !password) {
+    throw new Error("Expected NEWSLETTER_API_USERNAME and NEWSLETTER_API_PASSWORD in test")
+  }
+
+  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`
+}
+
 describe("api helpers", () => {
   beforeEach(() => {
     vi.resetModules()
@@ -72,7 +83,7 @@ describe("api helpers", () => {
       "https://api.example.com/api/v1/projects/",
       expect.objectContaining({
         headers: expect.objectContaining({
-          Authorization: "Basic ZnJvbnRlbmQtdXNlcjpmcm9udGVuZC1wYXNz",
+          Authorization: getExpectedBasicAuthHeader(),
         }),
       }),
     )
