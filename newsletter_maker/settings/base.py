@@ -72,6 +72,7 @@ INSTALLED_APPS = [
 
     # 3. Core Django Apps
     "django.contrib.admin",
+    'django.contrib.admindocs',
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

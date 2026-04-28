@@ -19,6 +19,7 @@ Django==6.0.4
 djangorestframework-simplejwt==5.5.1
 djangorestframework==3.17.1
 djlint==1.36.4
+docutils==0.22.4
 drf-nested-routers==0.95.0
 drf-spectacular==0.29.0
 drf-standardized-errors==0.15.0

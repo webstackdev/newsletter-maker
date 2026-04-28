@@ -16,6 +16,7 @@ urlpatterns = [
     path("", include("core.urls")),
     path("", root_redirect_view),
     path("admin/", admin.site.urls),
+    path('admin/doc/', include('django.contrib.admindocs.urls')),
     path("anymail/", include("anymail.urls")),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
