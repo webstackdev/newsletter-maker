@@ -59,7 +59,7 @@ def test_check_qdrant_returns_true_when_client_can_list_collections(mocker, sett
     client_cls.return_value.get_collections.return_value = SimpleNamespace(collections=[])
 
     assert _check_qdrant() is True
-    client_cls.assert_called_once_with(url=settings.QDRANT_URL, timeout=2)
+    client_cls.assert_called_once_with(url=settings.QDRANT_URL, timeout=2, check_compatibility=False)
 
 
 def test_check_qdrant_returns_false_when_client_errors(mocker):

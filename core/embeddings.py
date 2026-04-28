@@ -6,7 +6,7 @@ from typing import Any, cast
 from uuid import uuid4
 
 import httpx
-from django.conf import settings
+from django.conf import settings as django_settings
 from django.utils.dateparse import parse_datetime
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
@@ -19,8 +19,10 @@ from qdrant_client.models import (
 )
 
 from core.models import Content
+from core.settings_types import CoreSettings
 
 SentenceTransformer = None
+settings = cast(CoreSettings, django_settings)
 
 
 def get_sentence_transformer_class():
@@ -110,7 +112,7 @@ def collection_name_for_project(project_id: int) -> str:
 
 @lru_cache(maxsize=1)
 def get_qdrant_client() -> QdrantClient:
-    return QdrantClient(url=settings.QDRANT_URL, timeout=10)
+    return QdrantClient(url=settings.QDRANT_URL, timeout=10, check_compatibility=False)
 
 
 @lru_cache(maxsize=1)

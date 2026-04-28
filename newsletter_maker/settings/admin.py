@@ -31,3 +31,5 @@ UNFOLD = {
         "show_all_applications": False,
     },
 }
+
+__all__ = ["UNFOLD"]

@@ -43,3 +43,5 @@ SPECTACULAR_SETTINGS = {
         },
     ],
 }
+
+__all__ = ["SPECTACULAR_SETTINGS"]

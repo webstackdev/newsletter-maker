@@ -17,3 +17,13 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": 60 * 60 * 6,
     },
 }
+
+__all__ = [
+    "REDIS_URL",
+    "CELERY_BROKER_URL",
+    "CELERY_RESULT_BACKEND",
+    "CELERY_TASK_ALWAYS_EAGER",
+    "CELERY_TASK_TIME_LIMIT",
+    "CELERY_TASK_SOFT_TIME_LIMIT",
+    "CELERY_BEAT_SCHEDULE",
+]
