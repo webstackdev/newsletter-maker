@@ -47,6 +47,7 @@ pytest==9.0.3
 python-dotenv==1.2.2
 qdrant-client==1.17.1
 requests-toolbelt==1.0.0
+resend==2.29.0
 ruff==0.15.12
 sentence-transformers==5.4.1
 structlog==25.5.0

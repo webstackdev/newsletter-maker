@@ -5,6 +5,8 @@ from core.models import (
     Content,
     Entity,
     IngestionRun,
+    IntakeAllowlist,
+    NewsletterIntake,
     Project,
     ProjectConfig,
     ReviewQueue,
@@ -48,7 +50,16 @@ class ProjectSerializer(ProjectScopedSerializerMixin, serializers.ModelSerialize
 
     class Meta:
         model = Project
-        fields = ["id", "name", "group", "topic_description", "content_retention_days", "created_at"]
+        fields = [
+            "id",
+            "name",
+            "group",
+            "topic_description",
+            "content_retention_days",
+            "intake_token",
+            "intake_enabled",
+            "created_at",
+        ]
         read_only_fields = ["id", "created_at"]
 
 
@@ -103,6 +114,7 @@ class ContentSerializer(ProjectScopedSerializerMixin, serializers.ModelSerialize
             "content_text",
             "relevance_score",
             "embedding_id",
+            "source_metadata",
             "is_reference",
             "is_active",
         ]
@@ -205,3 +217,29 @@ class ReviewQueueSerializer(ProjectScopedSerializerMixin, serializers.ModelSeria
         if project and content and content.project_id != project.id:
             raise serializers.ValidationError({"content": "Content must belong to the selected project."})
         return attrs
+
+
+class IntakeAllowlistSerializer(ProjectScopedSerializerMixin, serializers.ModelSerializer):
+    class Meta:
+        model = IntakeAllowlist
+        fields = ["id", "project", "sender_email", "confirmed_at", "confirmation_token", "created_at"]
+        read_only_fields = ["id", "project", "confirmation_token", "created_at"]
+
+
+class NewsletterIntakeSerializer(ProjectScopedSerializerMixin, serializers.ModelSerializer):
+    class Meta:
+        model = NewsletterIntake
+        fields = [
+            "id",
+            "project",
+            "sender_email",
+            "subject",
+            "received_at",
+            "raw_html",
+            "raw_text",
+            "message_id",
+            "status",
+            "extraction_result",
+            "error_message",
+        ]
+        read_only_fields = ["id", "project", "received_at", "status", "extraction_result", "error_message"]

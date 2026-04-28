@@ -5,7 +5,8 @@ from django.conf import settings
 from django.utils import timezone
 
 from core.embeddings import upsert_content_embedding
-from core.models import Content, IngestionRun, RunStatus, SourceConfig
+from core.models import Content, IngestionRun, IntakeAllowlist, NewsletterIntake, NewsletterIntakeStatus, RunStatus, SourceConfig
+from core.newsletters import extract_newsletter_items
 from core.pipeline import (
     RELEVANCE_SKILL_NAME,
     SUMMARIZATION_SKILL_NAME,
@@ -107,12 +108,75 @@ def _ingest_source_config(source_config: SourceConfig) -> tuple[int, int]:
             published_date=item.published_date,
             content_text=item.content_text,
         )
-        upsert_content_embedding(content)
-        if settings.CELERY_TASK_ALWAYS_EAGER:
-            process_content(content.id)
-        else:
-            process_content.delay(content.id)
+        _schedule_content_processing(content)
         ingested_count += 1
     source_config.last_fetched_at = timezone.now()
     source_config.save(update_fields=["last_fetched_at"])
     return len(fetched_items), ingested_count
+
+
+@shared_task(name="core.tasks.process_newsletter_intake")
+def process_newsletter_intake(intake_id: int):
+    intake = NewsletterIntake.objects.select_related("project").get(pk=intake_id)
+
+    allowlist = IntakeAllowlist.objects.filter(
+        project=intake.project,
+        sender_email=intake.sender_email,
+        confirmed_at__isnull=False,
+    ).first()
+    if allowlist is None:
+        intake.status = NewsletterIntakeStatus.PENDING
+        intake.error_message = "Sender has not confirmed newsletter intake."
+        intake.save(update_fields=["status", "error_message"])
+        return {"status": intake.status, "items_ingested": 0}
+
+    extracted_items = extract_newsletter_items(
+        subject=intake.subject,
+        raw_html=intake.raw_html,
+        raw_text=intake.raw_text,
+    )
+    ingested_count = 0
+    for item in extracted_items:
+        if Content.objects.filter(project=intake.project, url=item.url).exists():
+            continue
+        content = Content.objects.create(
+            project=intake.project,
+            url=item.url,
+            title=item.title[:512],
+            author=intake.sender_email[:255],
+            source_plugin="newsletter",
+            published_date=timezone.now(),
+            content_text=item.excerpt or intake.raw_text,
+            source_metadata={
+                "newsletter_intake_id": intake.id,
+                "sender_email": intake.sender_email,
+                "position": item.position,
+            },
+        )
+        _schedule_content_processing(content)
+        ingested_count += 1
+
+    intake.status = NewsletterIntakeStatus.EXTRACTED
+    intake.error_message = ""
+    intake.extraction_result = {
+        "method": "heuristic",
+        "items": [
+            {
+                "url": item.url,
+                "title": item.title,
+                "excerpt": item.excerpt,
+                "position": item.position,
+            }
+            for item in extracted_items
+        ],
+    }
+    intake.save(update_fields=["status", "error_message", "extraction_result"])
+    return {"status": intake.status, "items_ingested": ingested_count}
+
+
+def _schedule_content_processing(content: Content) -> None:
+    upsert_content_embedding(content)
+    if settings.CELERY_TASK_ALWAYS_EAGER:
+        process_content(content.id)
+    else:
+        process_content.delay(content.id)

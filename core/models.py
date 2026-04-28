@@ -1,6 +1,16 @@
+import secrets
+
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import models
+
+
+def generate_project_intake_token() -> str:
+	return secrets.token_hex(16)
+
+
+def generate_confirmation_token() -> str:
+	return secrets.token_urlsafe(24)
 
 
 class EntityType(models.TextChoices):
@@ -26,6 +36,13 @@ class SourcePluginName(models.TextChoices):
 	REDDIT = "reddit", "Reddit"
 
 
+class NewsletterIntakeStatus(models.TextChoices):
+	PENDING = "pending", "Pending"
+	EXTRACTED = "extracted", "Extracted"
+	FAILED = "failed", "Failed"
+	REJECTED = "rejected", "Rejected"
+
+
 class RunStatus(models.TextChoices):
 	RUNNING = "running", "Running"
 	SUCCESS = "success", "Success"
@@ -47,6 +64,8 @@ class Project(models.Model):
 	group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name="projects")
 	topic_description = models.TextField()
 	content_retention_days = models.PositiveIntegerField(default=365)
+	intake_token = models.CharField(max_length=64, unique=True, default=generate_project_intake_token, editable=False)
+	intake_enabled = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
 
 	class Meta:
@@ -107,6 +126,7 @@ class Content(models.Model):
 	content_text = models.TextField()
 	relevance_score = models.FloatField(null=True, blank=True)
 	embedding_id = models.CharField(max_length=64, blank=True)
+	source_metadata = models.JSONField(default=dict, blank=True)
 	is_reference = models.BooleanField(default=False)
 	is_active = models.BooleanField(default=True)
 
@@ -121,6 +141,49 @@ class Content(models.Model):
 
 	def __str__(self) -> str:
 		return self.title
+
+
+class IntakeAllowlist(models.Model):
+	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="intake_allowlist")
+	sender_email = models.EmailField()
+	confirmed_at = models.DateTimeField(null=True, blank=True)
+	confirmation_token = models.CharField(max_length=64, unique=True, default=generate_confirmation_token)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["sender_email"]
+		constraints = [
+			models.UniqueConstraint(fields=["project", "sender_email"], name="core_allowlist_unique_project_sender"),
+		]
+
+	def __str__(self) -> str:
+		return f"{self.sender_email} for {self.project.name}"
+
+	@property
+	def is_confirmed(self) -> bool:
+		return self.confirmed_at is not None
+
+
+class NewsletterIntake(models.Model):
+	project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="newsletter_intakes")
+	sender_email = models.EmailField()
+	subject = models.CharField(max_length=512)
+	received_at = models.DateTimeField(auto_now_add=True)
+	raw_html = models.TextField(blank=True)
+	raw_text = models.TextField(blank=True)
+	message_id = models.CharField(max_length=255, unique=True)
+	status = models.CharField(max_length=16, choices=NewsletterIntakeStatus.choices, default=NewsletterIntakeStatus.PENDING)
+	extraction_result = models.JSONField(null=True, blank=True)
+	error_message = models.TextField(blank=True)
+
+	class Meta:
+		ordering = ["-received_at"]
+		indexes = [
+			models.Index(fields=["project", "sender_email", "status"]),
+		]
+
+	def __str__(self) -> str:
+		return f"{self.subject or self.message_id}"
 
 
 class SkillResult(models.Model):
