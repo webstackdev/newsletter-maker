@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
 import re
 from dataclasses import dataclass
 from email.utils import parseaddr
 from html.parser import HTMLParser
-from typing import Any, cast
+from typing import Any, Iterable, cast
 
 from django.conf import settings as django_settings
+from django.core.mail import EmailMultiAlternatives
+from django.urls import reverse
 
+from core.models import IntakeAllowlist, NewsletterIntake, Project
 from core.settings_types import CoreSettings
 
 settings = cast(CoreSettings, django_settings)
@@ -29,17 +30,6 @@ def sanitize_newsletter_html(raw_html: str) -> str:
     return INLINE_HANDLER_PATTERN.sub("", without_scripts)
 
 
-def compute_resend_signature(payload: bytes, secret: str) -> str:
-    return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-
-
-def verify_resend_signature(payload: bytes, provided_signature: str) -> bool:
-    if not settings.RESEND_WEBHOOK_SECRET or not provided_signature:
-        return False
-    expected_signature = compute_resend_signature(payload, settings.RESEND_WEBHOOK_SECRET)
-    return hmac.compare_digest(expected_signature, provided_signature)
-
-
 def extract_project_token(recipient: str) -> str | None:
     _, email_address = parseaddr(recipient)
     local_part = email_address.partition("@")[0]
@@ -50,23 +40,100 @@ def extract_project_token(recipient: str) -> str | None:
 
 
 def send_confirmation_email(*, to_email: str, confirm_url: str, project_name: str) -> None:
-    if not settings.RESEND_API_KEY:
-        raise RuntimeError("RESEND_API_KEY must be configured to send newsletter confirmation emails.")
-
-    import resend
-
-    resend.api_key = settings.RESEND_API_KEY
-    resend.Emails.send(
-        {
-            "from": settings.RESEND_FROM_EMAIL,
-            "to": [to_email],
-            "subject": f"Confirm newsletter intake for {project_name}",
-            "html": (
-                "<p>Confirm this sender for newsletter ingestion.</p>"
-                f'<p><a href="{confirm_url}">Confirm sender</a></p>'
-            ),
-        }
+    subject = f"Confirm newsletter intake for {project_name}"
+    text_body = (
+        "Confirm this sender for newsletter ingestion.\n\n"
+        f"Confirm sender: {confirm_url}"
     )
+    html_body = (
+        "<p>Confirm this sender for newsletter ingestion.</p>"
+        f'<p><a href="{confirm_url}">Confirm sender</a></p>'
+    )
+
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[to_email],
+    )
+    message.attach_alternative(html_body, "text/html")
+    message.send()
+
+
+def build_confirmation_url(token: str) -> str:
+    base_url = settings.NEWSLETTER_API_BASE_URL.rstrip("/")
+    return f"{base_url}{reverse('confirm-newsletter-sender', kwargs={'token': token})}"
+
+
+def process_inbound_newsletter(
+    *,
+    recipients: Iterable[str],
+    sender_email: str,
+    subject: str,
+    raw_html: str,
+    raw_text: str,
+    message_id: str,
+) -> dict[str, Any]:
+    project = _find_intake_project(recipients)
+    if project is None:
+        return {"status": "ignored", "reason": "no_matching_project"}
+
+    normalized_sender_email = normalize_sender_email(sender_email)
+    normalized_message_id = message_id.strip()
+    if not normalized_sender_email or not normalized_message_id:
+        return {"status": "ignored", "reason": "missing_sender_or_message_id"}
+
+    defaults = {
+        "project": project,
+        "sender_email": normalized_sender_email,
+        "subject": subject[:512],
+        "raw_html": sanitize_newsletter_html(raw_html),
+        "raw_text": raw_text,
+    }
+    intake, created = NewsletterIntake.objects.get_or_create(
+        message_id=normalized_message_id,
+        defaults=defaults,
+    )
+    if not created:
+        return {"id": intake.id, "status": intake.status, "duplicate": True}
+
+    allowlist, allowlist_created = IntakeAllowlist.objects.get_or_create(
+        project=project,
+        sender_email=normalized_sender_email,
+    )
+
+    if allowlist.is_confirmed:
+        queue_newsletter_intake(intake.id)
+        return {"id": intake.id, "status": intake.status}
+
+    if allowlist_created:
+        send_confirmation_email(
+            to_email=normalized_sender_email,
+            confirm_url=build_confirmation_url(allowlist.confirmation_token),
+            project_name=project.name,
+        )
+
+    return {"id": intake.id, "status": intake.status, "confirmation_required": True}
+
+
+def queue_newsletter_intake(intake_id: int) -> None:
+    from core.tasks import process_newsletter_intake
+
+    if settings.CELERY_TASK_ALWAYS_EAGER:
+        process_newsletter_intake(intake_id)
+    else:
+        process_newsletter_intake.delay(intake_id)
+
+
+def _find_intake_project(recipients: Iterable[str]) -> Project | None:
+    for recipient in recipients:
+        token = extract_project_token(recipient)
+        if token is None:
+            continue
+        project = Project.objects.filter(intake_token=token, intake_enabled=True).first()
+        if project is not None:
+            return project
+    return None
 
 
 @dataclass(slots=True)
@@ -146,10 +213,3 @@ def extract_newsletter_items(*, subject: str, raw_html: str, raw_text: str) -> l
         )
 
     return extracted_items
-
-
-def get_resend_payload_data(payload: dict[str, Any]) -> dict[str, Any]:
-    data = payload.get("data")
-    if isinstance(data, dict):
-        return data
-    return payload

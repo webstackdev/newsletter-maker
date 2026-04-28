@@ -177,3 +177,9 @@ For the default local bootstrap, `.env` also seeds an `admin` superuser in the c
 This repository is licensed under the GNU Affero General Public License v3.0 or later. See [LICENSE](LICENSE).
 
 Based on the current direct dependencies, AGPL is a reasonable fit: the packages in use are permissive or LGPL-compatible licenses such as BSD, MIT, Apache-2.0, and LGPLv3. That said, this is a practical compatibility check, not legal advice, so review it with counsel if you need a formal licensing opinion.
+
+In our skills/relevance_scoring/SKILL.md, I see that we're passing the tenant id. Are we evaluating the content item's relevance against all content items for a project (tenant)? Or how is the relevance actually calculated?
+
+I notice too we're still using "tenant_id". We changed our naming scheme from "tenant" to "project". We need to update the skills and anywhere else we're still referring to the old "tenant" naming scheme.
+
+How many Embedding Dimensions are we using to create embeddings? Where are we specifying that value for Qdrant records?

@@ -40,13 +40,25 @@ CSRF_TRUSTED_ORIGINS = env_list(
 
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 SITE_ID = int(os.getenv("SITE_ID", "1"))
+NEWSLETTER_API_BASE_URL = os.getenv("NEWSLETTER_API_BASE_URL", "http://127.0.0.1:8080")
 
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "newsletter-maker/0.1")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
-RESEND_WEBHOOK_SECRET = os.getenv("RESEND_WEBHOOK_SECRET", "")
+RESEND_INBOUND_SECRET = os.getenv("RESEND_INBOUND_SECRET", "")
+ANYMAIL_WEBHOOK_SECRET = os.getenv("ANYMAIL_WEBHOOK_SECRET", "")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", RESEND_FROM_EMAIL)
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "anymail.backends.resend.EmailBackend")
+ANYMAIL = {}
+if RESEND_API_KEY:
+    ANYMAIL["RESEND_API_KEY"] = RESEND_API_KEY
+if RESEND_INBOUND_SECRET:
+    ANYMAIL["RESEND_INBOUND_SECRET"] = RESEND_INBOUND_SECRET
+if ANYMAIL_WEBHOOK_SECRET:
+    ANYMAIL["WEBHOOK_SECRET"] = ANYMAIL_WEBHOOK_SECRET
 
 INSTALLED_APPS = [
     # 1. High-priority middleware dependencies
@@ -77,6 +89,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.github",
+    "anymail",
 
     # 5. Utilities & Schema Tools
     "import_export",  # Standard library
@@ -183,12 +196,18 @@ __all__ = [
     "CSRF_TRUSTED_ORIGINS",
     "DATABASE_URL",
     "SITE_ID",
+    "NEWSLETTER_API_BASE_URL",
     "REDDIT_CLIENT_ID",
     "REDDIT_CLIENT_SECRET",
     "REDDIT_USER_AGENT",
     "RESEND_API_KEY",
+    "RESEND_INBOUND_SECRET",
     "RESEND_FROM_EMAIL",
-    "RESEND_WEBHOOK_SECRET",
+    "ANYMAIL_WEBHOOK_SECRET",
+    "DEFAULT_FROM_EMAIL",
+    "SERVER_EMAIL",
+    "EMAIL_BACKEND",
+    "ANYMAIL",
     "INSTALLED_APPS",
     "MIDDLEWARE",
     "ROOT_URLCONF",
