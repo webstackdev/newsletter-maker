@@ -193,7 +193,7 @@ def test_bluesky_credentials_admin_form_encrypts_app_password(source_admin_conte
         data={
             "project": source_admin_context.project.id,
             "handle": "@Alice.BSKY.social",
-            "app_password": "app-password",
+            "credential_input": "app-password",
             "pds_url": "https://pds.example.com/xrpc/",
             "is_active": True,
         }

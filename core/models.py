@@ -205,6 +205,11 @@ class BlueskyCredentials(models.Model):
 
         return bool(self.app_password_encrypted)
 
+    def has_stored_credential(self) -> bool:
+        """Return whether an encrypted Bluesky credential has been stored."""
+
+        return self.has_app_password()
+
     def set_app_password(self, app_password: str) -> None:
         """Encrypt and store the given Bluesky app password."""
 
@@ -215,6 +220,11 @@ class BlueskyCredentials(models.Model):
             app_password.encode("utf-8")
         ).decode("utf-8")
 
+    def set_stored_credential(self, credential_value: str) -> None:
+        """Encrypt and store the given Bluesky credential value."""
+
+        self.set_app_password(credential_value)
+
     def get_app_password(self) -> str:
         """Decrypt and return the stored Bluesky app password."""
 
@@ -223,6 +233,11 @@ class BlueskyCredentials(models.Model):
         return _bluesky_credentials_fernet().decrypt(
             self.app_password_encrypted.encode("utf-8")
         ).decode("utf-8")
+
+    def get_stored_credential(self) -> str:
+        """Decrypt and return the stored Bluesky credential value."""
+
+        return self.get_app_password()
 
     def save(self, *args, **kwargs):
         """Normalize stored account fields before persisting the credentials."""

@@ -32,38 +32,36 @@ from core.plugins import get_plugin_for_source_config, validate_plugin_config
 
 
 class BlueskyCredentialsAdminForm(forms.ModelForm):
-    """Admin form that accepts a plaintext app password without exposing ciphertext."""
+    """Admin form that accepts a plaintext Bluesky app credential input."""
 
-    app_password = forms.CharField(
+    credential_input = forms.CharField(
         required=False,
         strip=False,
         widget=forms.PasswordInput(render_value=False),
-        help_text=(
-            "Leave blank to keep the existing app password. Stored encrypted at rest."
-        ),
-        label="App password",
+        help_text="Leave blank to keep the existing stored credential.",
+        label="Bluesky app credential",
     )
 
     class Meta:
         model = BlueskyCredentials
-        fields = ["project", "handle", "app_password", "pds_url", "is_active"]
+        fields = ["project", "handle", "pds_url", "is_active"]
 
     def clean(self):
-        """Require an app password when creating credentials for the first time."""
+        """Require a credential when creating the record for the first time."""
 
         cleaned_data = super().clean()
-        app_password = cleaned_data.get("app_password", "")
-        if not self.instance.has_app_password() and not app_password:
-            self.add_error("app_password", "App password is required.")
+        credential_input = cleaned_data.get("credential_input", "")
+        if not self.instance.has_stored_credential() and not credential_input:
+            self.add_error("credential_input", "A Bluesky app credential is required.")
         return cleaned_data
 
     def save(self, commit=True):
-        """Encrypt a new app password before saving the model instance."""
+        """Encrypt a new credential value before saving the model instance."""
 
         instance = super().save(commit=False)
-        app_password = self.cleaned_data.get("app_password", "")
-        if app_password:
-            instance.set_app_password(app_password)
+        credential_input = self.cleaned_data.get("credential_input", "")
+        if credential_input:
+            instance.set_stored_credential(credential_input)
         if commit:
             instance.save()
         return instance
@@ -99,7 +97,7 @@ class BlueskyCredentialsAdmin(ModelAdmin):
         "project",
         "handle",
         "display_pds_host",
-        "has_stored_app_password",
+        "has_stored_credential",
         "is_active",
         "last_verified_at",
     )
@@ -107,7 +105,7 @@ class BlueskyCredentialsAdmin(ModelAdmin):
     search_fields = ("project__name", "handle", "pds_url")
     autocomplete_fields = ("project",)
     readonly_fields = (
-        "has_stored_app_password",
+        "has_stored_credential",
         "last_verified_at",
         "last_error",
         "created_at",
@@ -116,7 +114,7 @@ class BlueskyCredentialsAdmin(ModelAdmin):
     fieldsets = (
         (
             "Account",
-            {"fields": ("project", "handle", "app_password", "is_active")},
+            {"fields": ("project", "handle", "credential_input", "is_active")},
         ),
         (
             "PDS Override",
@@ -129,7 +127,7 @@ class BlueskyCredentialsAdmin(ModelAdmin):
             "Verification",
             {
                 "fields": (
-                    "has_stored_app_password",
+                    "has_stored_credential",
                     "last_verified_at",
                     "last_error",
                     "created_at",
@@ -145,11 +143,11 @@ class BlueskyCredentialsAdmin(ModelAdmin):
 
         return obj.pds_url or "Bluesky hosted default"
 
-    @admin.display(boolean=True, description="Stored App Password")
-    def has_stored_app_password(self, obj):
-        """Return whether an encrypted app password has been configured."""
+    @admin.display(boolean=True, description="Stored Credential")
+    def has_stored_credential(self, obj):
+        """Return whether an encrypted Bluesky credential has been configured."""
 
-        return obj.has_app_password()
+        return obj.has_stored_credential()
 
     @admin.action(description="Verify Selected Credentials")
     def verify_selected_credentials(self, request, queryset):
