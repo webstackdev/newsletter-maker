@@ -5,6 +5,7 @@ external clients. It also centralizes the drf-spectacular helpers that keep the
 generated schema consistent across similar viewsets.
 """
 
+import logging
 from typing import Any
 
 from drf_spectacular.utils import (
@@ -21,6 +22,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
 from core.models import (
+    BlueskyCredentials,
     Content,
     Entity,
     IngestionRun,
@@ -47,6 +49,8 @@ CLASSIFICATION_SKILL_NAME = "content_classification"
 RELEVANCE_SKILL_NAME = "relevance_scoring"
 SUMMARIZATION_SKILL_NAME = "summarization"
 RELATED_CONTENT_SKILL_NAME = "find_related"
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ID_PARAMETER = OpenApiParameter(
     name="project_id",
@@ -109,6 +113,20 @@ SOURCE_CONFIG_REDDIT_REQUEST_EXAMPLE = OpenApiExample(
             "subreddit": "MachineLearning",
             "listing": "both",
             "limit": 25,
+        },
+        "is_active": True,
+    },
+    request_only=True,
+)
+
+SOURCE_CONFIG_BLUESKY_REQUEST_EXAMPLE = OpenApiExample(
+    "Create Bluesky Source Request",
+    value={
+        "plugin_name": "bluesky",
+        "config": {
+            "author_handle": "alice.bsky.social",
+            "include_replies": False,
+            "max_posts_per_fetch": 100,
         },
         "is_active": True,
     },
@@ -226,6 +244,16 @@ AUTHENTICATION_REQUIRED_RESPONSE = OpenApiResponse(
     ),
     description="Authentication credentials are required to access this endpoint.",
     examples=[AUTHENTICATION_REQUIRED_EXAMPLE],
+)
+
+BLUESKY_CREDENTIALS_VERIFY_RESPONSE = inline_serializer(
+    name="BlueskyCredentialsVerifyResponse",
+    fields={
+        "status": serializers.CharField(),
+        "handle": serializers.CharField(),
+        "last_verified_at": serializers.DateTimeField(allow_null=True),
+        "last_error": serializers.CharField(allow_blank=True),
+    },
 )
 
 
@@ -554,6 +582,80 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         return self.queryset.filter(group__user=self.request.user).distinct()
 
+    @extend_schema(
+        summary="Verify Bluesky credentials",
+        description=(
+            "Verify the selected project's stored Bluesky credentials by authenticating "
+            "the account and checking the current session."
+        ),
+        tags=["Ingestion"],
+        request=None,
+        responses={
+            200: build_success_response(
+                BLUESKY_CREDENTIALS_VERIFY_RESPONSE,
+                "The project's Bluesky credentials were verified successfully.",
+            ),
+            400: OpenApiResponse(
+                response=inline_serializer(
+                    name="BlueskyCredentialsVerifyErrorResponse",
+                    fields={
+                        "type": serializers.CharField(),
+                        "errors": inline_serializer(
+                            name="BlueskyCredentialsVerifyError",
+                            fields={
+                                "code": serializers.CharField(),
+                                "detail": serializers.CharField(),
+                                "attr": serializers.CharField(allow_null=True),
+                            },
+                            many=True,
+                        ),
+                    },
+                ),
+                description="The project is missing Bluesky credentials or verification failed.",
+            ),
+            403: AUTHENTICATION_REQUIRED_RESPONSE,
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="verify-bluesky-credentials")
+    def verify_bluesky_credentials(self, request, *args, **kwargs):
+        """Verify the Bluesky credentials stored for the selected project."""
+
+        from core.plugins.bluesky import BlueskySourcePlugin
+
+        project = self.get_object()
+        try:
+            credentials = project.bluesky_credentials
+        except BlueskyCredentials.DoesNotExist as exc:
+            raise serializers.ValidationError(
+                {"bluesky_credentials": "No Bluesky credentials are configured for this project."}
+            ) from exc
+
+        try:
+            BlueskySourcePlugin.verify_credentials(credentials)
+        except Exception as exc:
+            logger.exception(
+                "Bluesky credential verification failed for project id=%s",
+                project.id,
+            )
+            raise serializers.ValidationError(
+                {
+                    "bluesky_credentials": (
+                        "Credential verification failed. Please re-check the credentials "
+                        "and try again."
+                    )
+                }
+            ) from exc
+
+        credentials.refresh_from_db()
+        return Response(
+            {
+                "status": "verified",
+                "handle": credentials.handle,
+                "last_verified_at": credentials.last_verified_at,
+                "last_error": "",
+            }
+        )
+
 
 @document_project_owned_viewset(
     resource_plural="project configurations",
@@ -741,6 +843,7 @@ class IngestionRunViewSet(ProjectOwnedQuerysetMixin, viewsets.ModelViewSet):
         create_examples=[
             SOURCE_CONFIG_CREATE_REQUEST_EXAMPLE,
             SOURCE_CONFIG_REDDIT_REQUEST_EXAMPLE,
+            SOURCE_CONFIG_BLUESKY_REQUEST_EXAMPLE,
             SOURCE_CONFIG_RESPONSE_EXAMPLE,
         ],
         create_response_examples=[SOURCE_CONFIG_RESPONSE_EXAMPLE],

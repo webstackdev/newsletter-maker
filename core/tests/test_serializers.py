@@ -224,6 +224,29 @@ def test_source_config_serializer_surfaces_plugin_validation_errors(serializer_c
     assert serializer.errors == {"config": ["Missing required config field: feed_url"]}
 
 
+def test_source_config_serializer_normalizes_bluesky_author_handle_config(
+    serializer_context,
+):
+    serializer = SourceConfigSerializer(
+        data={
+            "plugin_name": SourcePluginName.BLUESKY,
+            "config": {"author_handle": "@Alice.BSKY.social"},
+            "is_active": True,
+        },
+        context={
+            "request": _request_for(serializer_context.user),
+            "project": serializer_context.project,
+        },
+    )
+
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["config"] == {
+        "author_handle": "alice.bsky.social",
+        "include_replies": False,
+        "max_posts_per_fetch": 100,
+    }
+
+
 def test_entity_serializer_filters_project_queryset_to_request_user(serializer_context):
     serializer = EntitySerializer(
         context={"request": _request_for(serializer_context.user)}

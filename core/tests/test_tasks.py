@@ -161,6 +161,55 @@ def test_run_ingestion_creates_content_from_reddit_posts(source_plugin_context, 
     assert content.entity is None
 
 
+def test_ingest_source_config_deduplicates_bluesky_posts_by_post_uri(
+    source_plugin_context, mocker
+):
+    upsert_embedding_mock = mocker.patch("core.tasks.upsert_content_embedding")
+    process_content_delay_mock = mocker.patch("core.tasks.process_content.delay")
+    source_config = SourceConfig.objects.create(
+        project=source_plugin_context.project,
+        plugin_name=SourcePluginName.BLUESKY,
+        config={"author_handle": "example.bsky.social"},
+    )
+    Content.objects.create(
+        project=source_plugin_context.project,
+        entity=source_plugin_context.entity,
+        url="https://example.com/existing-article",
+        title="Existing Bluesky Post",
+        author="example.bsky.social",
+        source_plugin=SourcePluginName.BLUESKY,
+        published_date="2026-04-20T12:00:00Z",
+        content_text="Existing content",
+        source_metadata={"post_uri": "at://did:plc:author/app.bsky.feed.post/abc123"},
+    )
+    plugin = SimpleNamespace(
+        fetch_new_content=lambda since: [
+            SimpleNamespace(
+                url="https://example.com/new-canonical-url",
+                title="Duplicate Bluesky Post",
+                author="example.bsky.social",
+                published_date=datetime(2026, 4, 20, 12, 0, tzinfo=timezone.utc),
+                content_text="Duplicate content",
+                source_plugin=SourcePluginName.BLUESKY,
+                source_metadata={
+                    "author_handle": "example.bsky.social",
+                    "post_uri": "at://did:plc:author/app.bsky.feed.post/abc123",
+                },
+            )
+        ],
+        match_entity_for_item=lambda item: source_plugin_context.entity,
+    )
+    mocker.patch("core.tasks.get_plugin_for_source_config", return_value=plugin)
+
+    items_fetched, items_ingested = _ingest_source_config(source_config)
+
+    assert items_fetched == 1
+    assert items_ingested == 0
+    assert Content.objects.filter(project=source_plugin_context.project).count() == 1
+    upsert_embedding_mock.assert_not_called()
+    process_content_delay_mock.assert_not_called()
+
+
 def test_run_all_ingestions_enqueues_active_source_configs(
     source_plugin_context, mocker
 ):

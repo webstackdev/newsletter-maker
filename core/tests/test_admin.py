@@ -8,6 +8,8 @@ from django.contrib.auth.models import Group
 from django.utils import timezone
 
 from core.admin import (
+    BlueskyCredentialsAdmin,
+    BlueskyCredentialsAdminForm,
     ContentAdmin,
     EntityAdmin,
     HighValueFilter,
@@ -18,6 +20,7 @@ from core.admin import (
     UserFeedbackAdmin,
 )
 from core.models import (
+    BlueskyCredentials,
     Content,
     Entity,
     IngestionRun,
@@ -183,6 +186,78 @@ def test_review_queue_display_confidence_renders_without_django6_format_error(
     rendered = admin_instance.display_confidence(review_item)
 
     assert "42%" in rendered
+
+
+def test_bluesky_credentials_admin_form_encrypts_app_password(source_admin_context):
+    form = BlueskyCredentialsAdminForm(
+        data={
+            "project": source_admin_context.project.id,
+            "handle": "@Alice.BSKY.social",
+            "credential_input": "app-password",
+            "pds_url": "https://pds.example.com/xrpc/",
+            "is_active": True,
+        }
+    )
+
+    assert form.is_valid(), form.errors
+    credentials = form.save()
+
+    assert credentials.handle == "alice.bsky.social"
+    assert credentials.pds_url == "https://pds.example.com"
+    assert credentials.has_app_password() is True
+    assert credentials.get_app_password() == "app-password"
+
+
+def test_verify_selected_bluesky_credentials_reports_success(
+    source_admin_context, mocker
+):
+    credentials = BlueskyCredentials.objects.create(
+        project=source_admin_context.project,
+        handle="alice.bsky.social",
+        app_password_encrypted="ciphertext",
+    )
+    verify_mock = mocker.patch("core.plugins.bluesky.BlueskySourcePlugin.verify_credentials")
+    admin_instance = BlueskyCredentialsAdmin(BlueskyCredentials, AdminSite())
+    admin_instance.message_user = mocker.Mock()
+
+    admin_instance.verify_selected_credentials(
+        request=SimpleNamespace(),
+        queryset=BlueskyCredentials.objects.filter(pk=credentials.pk),
+    )
+
+    verify_mock.assert_called_once_with(credentials)
+    admin_instance.message_user.assert_called_once_with(
+        ANY,
+        "Credential verification passed for 1 account(s).",
+        messages.SUCCESS,
+    )
+
+
+def test_verify_selected_bluesky_credentials_reports_failures(
+    source_admin_context, mocker
+):
+    credentials = BlueskyCredentials.objects.create(
+        project=source_admin_context.project,
+        handle="alice.bsky.social",
+        app_password_encrypted="ciphertext",
+    )
+    mocker.patch(
+        "core.plugins.bluesky.BlueskySourcePlugin.verify_credentials",
+        side_effect=RuntimeError("bad login"),
+    )
+    admin_instance = BlueskyCredentialsAdmin(BlueskyCredentials, AdminSite())
+    admin_instance.message_user = mocker.Mock()
+
+    admin_instance.verify_selected_credentials(
+        request=SimpleNamespace(),
+        queryset=BlueskyCredentials.objects.filter(pk=credentials.pk),
+    )
+
+    admin_instance.message_user.assert_called_once_with(
+        ANY,
+        "Credential verification failed for: Bluesky credentials for Admin Project: bad login",
+        messages.ERROR,
+    )
 
 
 def test_ingestion_run_display_efficiency_renders_without_django6_format_error(

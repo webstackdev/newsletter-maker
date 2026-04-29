@@ -18,6 +18,7 @@ class ContentItem:
     published_date: datetime
     content_text: str
     source_plugin: str
+    source_metadata: dict[str, object] | None = None
 
 
 class SourcePlugin(ABC):
@@ -76,6 +77,15 @@ class SourcePlugin(ABC):
             if self._normalize_hostname(entity.website_url) == target_hostname:
                 return entity
         return None
+
+    def match_entity_for_item(self, item: ContentItem):
+        """Match a fetched content item to an entity.
+
+        The default implementation preserves the existing hostname-based behavior
+        by matching against the normalized item URL.
+        """
+
+        return self.match_entity_for_url(item.url)
 
     @staticmethod
     def _normalize_hostname(url: str) -> str:

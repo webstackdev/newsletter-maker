@@ -3,12 +3,14 @@
 from typing import Any
 
 from core.models import SourcePluginName
+from core.plugins.bluesky import BlueskySourcePlugin
 from core.plugins.reddit import RedditSourcePlugin
 from core.plugins.rss import RSSSourcePlugin
 
 PLUGIN_REGISTRY = {
     SourcePluginName.RSS: RSSSourcePlugin,
     SourcePluginName.REDDIT: RedditSourcePlugin,
+    SourcePluginName.BLUESKY: BlueskySourcePlugin,
 }
 
 

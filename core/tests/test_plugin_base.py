@@ -102,6 +102,29 @@ def test_source_plugin_match_entity_for_url_returns_none_when_no_entity_matches(
     assert plugin.match_entity_for_url("https://example.com/posts/123") is None
 
 
+def test_source_plugin_match_entity_for_item_delegates_to_url_matching(plugin_context):
+    matching_entity = Entity.objects.create(
+        project=plugin_context.project,
+        name="Matching Entity",
+        type="vendor",
+        website_url="https://example.com/company",
+    )
+    plugin = DummySourcePlugin(plugin_context.source_config)
+
+    result = plugin.match_entity_for_item(
+        ContentItem(
+            url="https://example.com/posts/123",
+            title="Example",
+            author="Author",
+            published_date=datetime(2026, 4, 28, 12, 0, tzinfo=UTC),
+            content_text="Body",
+            source_plugin="dummy",
+        )
+    )
+
+    assert result == matching_entity
+
+
 def test_source_plugin_abstract_methods_raise_not_implemented(plugin_context):
     plugin = DummySourcePlugin(plugin_context.source_config)
 

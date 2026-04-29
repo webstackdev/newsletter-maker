@@ -148,23 +148,46 @@ def _ingest_source_config(source_config: SourceConfig) -> tuple[int, int]:
     fetched_items = plugin.fetch_new_content(source_config.last_fetched_at)
     ingested_count = 0
     for item in fetched_items:
-        if Content.objects.filter(project=source_config.project, url=item.url).exists():
+        if _content_exists_for_item(source_config, item):
             continue
+        source_metadata = getattr(item, "source_metadata", None) or {}
         content = Content.objects.create(
             project=source_config.project,
-            entity=plugin.match_entity_for_url(item.url),
+            entity=_match_entity_for_item(plugin, item),
             url=item.url,
             title=item.title[:512],
             author=item.author[:255],
             source_plugin=item.source_plugin,
             published_date=item.published_date,
             content_text=item.content_text,
+            source_metadata=source_metadata,
         )
         _schedule_content_processing(content)
         ingested_count += 1
     source_config.last_fetched_at = timezone.now()
     source_config.save(update_fields=["last_fetched_at"])
     return len(fetched_items), ingested_count
+
+
+def _content_exists_for_item(source_config: SourceConfig, item) -> bool:
+    """Check whether a fetched item already exists for the project."""
+
+    post_uri = (getattr(item, "source_metadata", None) or {}).get("post_uri")
+    if post_uri:
+        return Content.objects.filter(
+            project=source_config.project,
+            source_plugin=item.source_plugin,
+            source_metadata__post_uri=post_uri,
+        ).exists()
+    return Content.objects.filter(project=source_config.project, url=item.url).exists()
+
+
+def _match_entity_for_item(plugin, item):
+    """Resolve the entity for an item while preserving older plugin mocks."""
+
+    if callable(getattr(type(plugin), "match_entity_for_item", None)):
+        return plugin.match_entity_for_item(item)
+    return plugin.match_entity_for_url(item.url)
 
 
 @shared_task(name="core.tasks.process_newsletter_intake")
