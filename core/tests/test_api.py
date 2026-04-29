@@ -192,12 +192,16 @@ class ProjectScopedApiTests(APITestCase):
         self.assertEqual(verified_credentials.id, credentials.id)
         self.assertEqual(response.json()["status"], "verified")
         self.assertEqual(response.json()["handle"], "project.bsky.social")
+        self.assertEqual(response.json()["last_error"], "")
 
+    @patch("core.api.logger.exception")
     @patch(
         "core.plugins.bluesky.BlueskySourcePlugin.verify_credentials",
         side_effect=RuntimeError("bad login"),
     )
-    def test_verify_bluesky_credentials_surfaces_verification_errors(self, _verify_mock):
+    def test_verify_bluesky_credentials_surfaces_verification_errors(
+        self, _verify_mock, logger_exception_mock
+    ):
         credentials = BlueskyCredentials(project=self.owner_project, handle="project.bsky.social")
         credentials.set_app_password("app-password")
         credentials.save()
@@ -213,6 +217,11 @@ class ProjectScopedApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assert_standardized_validation_error(
             response.json(), "bluesky_credentials"
+        )
+        self.assertNotIn("bad login", str(response.json()))
+        logger_exception_mock.assert_called_once_with(
+            "Bluesky credential verification failed for project id=%s",
+            self.owner_project.id,
         )
 
     def test_feedback_create_assigns_current_user(self):

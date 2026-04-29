@@ -5,6 +5,7 @@ external clients. It also centralizes the drf-spectacular helpers that keep the
 generated schema consistent across similar viewsets.
 """
 
+import logging
 from typing import Any
 
 from drf_spectacular.utils import (
@@ -48,6 +49,8 @@ CLASSIFICATION_SKILL_NAME = "content_classification"
 RELEVANCE_SKILL_NAME = "relevance_scoring"
 SUMMARIZATION_SKILL_NAME = "summarization"
 RELATED_CONTENT_SKILL_NAME = "find_related"
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ID_PARAMETER = OpenApiParameter(
     name="project_id",
@@ -630,7 +633,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
         try:
             BlueskySourcePlugin.verify_credentials(credentials)
         except Exception as exc:
-            raise serializers.ValidationError({"bluesky_credentials": str(exc)}) from exc
+            logger.exception(
+                "Bluesky credential verification failed for project id=%s",
+                project.id,
+            )
+            raise serializers.ValidationError(
+                {
+                    "bluesky_credentials": (
+                        "Credential verification failed. Please re-check the credentials "
+                        "and try again."
+                    )
+                }
+            ) from exc
 
         credentials.refresh_from_db()
         return Response(
@@ -638,7 +652,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 "status": "verified",
                 "handle": credentials.handle,
                 "last_verified_at": credentials.last_verified_at,
-                "last_error": credentials.last_error,
+                "last_error": "",
             }
         )
 
